@@ -34,8 +34,8 @@ def get_hog(image):
     return descriptor.compute(gray)
 
 
-'''
-max_id = 40
+# Train
+max_id = 5
 direction = "video-02\\"
 pics = []
 hogs = []
@@ -52,7 +52,8 @@ for i in range(max_id + 1):
             continue
 
 for each in pics:
-    resize = cv2.resize(each, (200, 200))
+    resize = cv2.resize(each, (150, 150), interpolation=cv2.INTER_AREA)
+    # resize = cv2.resize(resize, (120, 120), interpolation=cv2.INTER_AREA)
     hogs.append(get_hog(resize))
 
 for each in pics:
@@ -74,6 +75,11 @@ for each in pics:
 hogs = np.array(hogs)
 labels = np.array(labels)
 
+print(hogs)
+print(labels)
+
+exit(0)
+
 svm = SVM()
 try:
     svm.load('mats\\item_recognize.data')
@@ -84,6 +90,7 @@ svm.train(hogs, labels)
 svm.save('mats\\item_recognize.data')
 '''
 
+# detect
 max_id = 40
 direction = "video-02\\"
 pics = []
@@ -130,3 +137,4 @@ for i in range(len(hogs)):
     cv2.imshow(name, pics[i])
 
 cv2.waitKey(0)
+'''

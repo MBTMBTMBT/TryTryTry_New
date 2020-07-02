@@ -6,7 +6,7 @@ from tools import Display, Geometry, Similarity, Hog
 
 
 def main(video_input: str):
-    svm = cv2.ml.SVM_load("mats\\item_recognize.data")
+    svm = cv2.ml.SVM_load("mats\\item_recognize_car_only.data")
     camera = Video.Camera(6, 30, 53, 30)
     background_subtractor = cv2.createBackgroundSubtractorKNN()
     video = Video.Video(cv2.VideoCapture(video_input), video_name=video_input)
@@ -25,10 +25,11 @@ def main(video_input: str):
         frame = Video.Frame(frame, i + 1, video)
         copy = frame.cv_frame.copy()
 
+        # dst = cv2.fastNlMeansDenoisingColored(frame.cv_frame.copy())
         frame_blur = cv2.GaussianBlur(frame.cv_frame.copy(), (13, 13), 0)  # 高斯模糊
         fgmask = background_subtractor.apply(frame_blur)  # 由KNN产生
-        th = cv2.threshold(fgmask.copy(), 244, 255, cv2.THRESH_BINARY)[1]  # 二值化
-        dilated = cv2.dilate(th, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)), iterations=1)  # 扩张
+        th = cv2.threshold(fgmask, 244, 255, cv2.THRESH_BINARY)[1]  # 二值化
+        dilated = cv2.dilate(th, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)), iterations=1)  # 扩张
         # cv2.imshow("dilated", dilated)
         contours, hier = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
@@ -104,7 +105,7 @@ def main(video_input: str):
                     if shot is not None:
                         hogs = []
                         descriptor = cv2.HOGDescriptor()
-                        shot = cv2.resize(shot, (200, 200))
+                        shot = cv2.resize(shot, (150, 150))
                         gray = cv2.cvtColor(shot, cv2.COLOR_BGR2GRAY)
                         hog = descriptor.compute(gray)
                         hogs.append(hog)
@@ -126,10 +127,12 @@ def main(video_input: str):
                 video.died_items.append(each)
                 each.take_quick_shot(frame.cv_frame)
                 # make hog
+                '''
                 if th_hog is not None:
                     th_hog.join()
                 th_hog = Hog.HogThread(each.quick_shots, [])
                 th_hog.start()
+                '''
                 each.display_quick_shots()
         video.items = new_items
 
@@ -147,6 +150,8 @@ def main(video_input: str):
         # show frame
         video.add_frame_to_video(copy)
         cv2.imshow('frame', copy)
+        # cv2.imshow('blur', frame_blur)
+        cv2.imshow('mask', dilated)
 
         # quit on ESC button
         if cv2.waitKey(1) & 0xFF == 27:  # Esc pressed
