@@ -29,7 +29,7 @@ def main(video_input: str):
         frame_blur = cv2.GaussianBlur(frame.cv_frame.copy(), (13, 13), 0)  # 高斯模糊
         fgmask = background_subtractor.apply(frame_blur)  # 由KNN产生
         th = cv2.threshold(fgmask, 244, 255, cv2.THRESH_BINARY)[1]  # 二值化
-        dilated = cv2.dilate(th, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)), iterations=1)  # 扩张
+        dilated = cv2.dilate(th, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)), iterations=1)  # 扩张
         # cv2.imshow("dilated", dilated)
         contours, hier = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
