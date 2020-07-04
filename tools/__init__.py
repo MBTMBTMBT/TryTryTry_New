@@ -1,1 +1,1 @@
-__all__ = ["DataStructure", "Geometry", "Display", "Similarity", "Numbers", "Hog"]
+__all__ = ["DataStructure", "Geometry", "Display", "Similarity", "Numbers", "Hog", "Tracker"]
