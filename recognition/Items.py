@@ -29,7 +29,7 @@ class Item(object):
         self.quick_shots = []
         self.take_quick_shot(cv_frame)
         self.start_time = start_time
-        self.start_time = 0
+        self.end_time = 0
 
     # def get_location(self) -> Geometry.Point:
     #     return self.location
@@ -86,14 +86,21 @@ class Item(object):
         return success, box
 
     def get_speed(self, video, frame_count):
-        if len(self.move_length) > 1:
-            distance = self.move_length[len(self.move_length) - 1]
+        if len(self.move_length) > 2:
+            distance = self.move_length[-2]
             speed = distance * video.fps
             self.speed.append(speed)
-            now = self.real_trace[len(self.real_trace) - 1]
+            now = self.real_trace[-1]
             last = self.real_trace[0]
             total_distance = math.sqrt((now[0] - last[0]) ** 2 + (now[1] - last[1]) ** 2)
-            self.average_speed = total_distance / (frame_count / video.fps)
+            '''
+            if self.identification == 25:
+                print(self.identification)
+                print(now, last)
+                print(total_distance, frame_count / video.fps)
+                print("================")
+                '''
+            self.average_speed = total_distance / (frame_count / video.fps - self.start_time / 1000)
             # print(total_distance)
             return speed, self.average_speed
         else:
@@ -135,6 +142,9 @@ class Item(object):
     def get_horizontal_offset(self, camera, pixel_width=1920, pixel_height=1080):
         pixel = self.rect.get_mid_point().get_coord()[0]
         return camera.count_horizontal_offset(self.get_distance(camera, pixel_height), pixel, pixel_width)
+
+    def suicide(self, time_in_ms: int):
+        self.end_time = time_in_ms
 
     @staticmethod
     def are_overlapping(item1, item2) -> bool:

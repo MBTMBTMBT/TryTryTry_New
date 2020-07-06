@@ -1,13 +1,12 @@
 import cv2
 import numpy as np
-import matplotlib.pyplot as plt
 from recognition import Items, Video
 from tools import Display, Geometry, Similarity, Hog
 
 
 def main(video_input: str):
-    svm = cv2.ml.SVM_load("mats\\item_recognize_car_only.data")
-    camera = Video.Camera(6, 30, 53, 30)
+    # svm = cv2.ml.SVM_load("mats\\item_recognize_car_only.data")
+    camera = Video.Camera(6, 20, 38, 45)
     background_subtractor = cv2.createBackgroundSubtractorKNN()
     video = Video.Video(cv2.VideoCapture(video_input), video_name=video_input)
     shape = (video.video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT),
@@ -18,11 +17,11 @@ def main(video_input: str):
     item_count = 0
     th_hog = None
 
-    for i in range(video.total_frames_num):
+    for frame_count in range(video.total_frames_num):
         success, frame = video.video_capture.read()
         if not success:
             break
-        frame = Video.Frame(frame, i + 1, video)
+        frame = Video.Frame(frame, frame_count + 1, video)
         copy = frame.cv_frame.copy()
 
         # dst = cv2.fastNlMeansDenoisingColored(frame.cv_frame.copy())
@@ -64,7 +63,7 @@ def main(video_input: str):
                                     each.tracker.init(frame.cv_frame, (x, y, w, h))
                                     each.remain = True
                                 elif similarity < 0.2:
-                                    time = video.get_time(i)
+                                    time = video.get_time(frame_count)
                                     item = Items.Item(item_count, x, y, w, h, time, frame.cv_frame)
                                     item.remain = True
                                     item.is_overlapping = True
@@ -74,7 +73,7 @@ def main(video_input: str):
                                     break
                                 break
                     else:
-                        time = video.get_time(i)
+                        time = video.get_time(frame_count)
                         item = Items.Item(item_count, x, y, w, h, time, frame.cv_frame)
                         item.remain = True
                         video.items.append(item)
@@ -102,6 +101,7 @@ def main(video_input: str):
                     shot = each.take_quick_shot(frame.cv_frame)
 
                     # recognition test
+                    '''
                     if shot is not None:
                         hogs = []
                         descriptor = cv2.HOGDescriptor()
@@ -112,6 +112,7 @@ def main(video_input: str):
                         hogs = np.array(hogs)
                         _, p = svm.predict(hogs)
                         print(p)
+                        '''
 
                     each.sort_quick_shots()
                     if len(each.quick_shots) >= 3:
@@ -122,8 +123,8 @@ def main(video_input: str):
 
             # item will be killed
             elif len(each.trace) >= 20:
-                time = video.get_time(i)
-                each.end_time = time
+                time = video.get_time(frame_count)
+                each.suicide(time)
                 video.died_items.append(each)
                 each.take_quick_shot(frame.cv_frame)
                 # make hog
@@ -138,7 +139,7 @@ def main(video_input: str):
 
         for each in video.items:
             cv2.rectangle(copy, each.rect.get_coord(), each.rect.get_coord_opposite(), (0, 0, 255), 2)
-            _, average_speed = each.get_speed(video, i + 1)
+            _, average_speed = each.get_speed(video, frame_count + 1)
             string = "ID: " + str(each.identification) \
                      + " Distance: %.2fm" % each.get_distance(camera, video.picture_rect.height) \
                      + " horizontal: %.2fm" % each.get_horizontal_offset(camera) \
@@ -163,4 +164,6 @@ def main(video_input: str):
 
 
 if __name__ == '__main__':
-    main('video-02.mp4')
+    # main('video-02.mp4')
+    # main('video-01.avi')
+    main('video-03.avi')

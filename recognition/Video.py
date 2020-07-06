@@ -118,7 +118,15 @@ class Video(object):
             string = "%s\\%d_%d.png" % (self.video_name, item.identification, count)
             cv.imwrite(string, each_img)
             count += 1
-        pass
+        file = open('%s\\id%d.txt' % (self.video_name, item.identification), 'w')
+        file.write("* 出现时间；%dms %s\n" % (item.start_time, Display.format_time(item.start_time)))
+        file.write("* 离开时间：%dms %s\n" % (item.end_time, Display.format_time(item.end_time)))
+        start_point = item.real_trace[0]
+        end_point = item.real_trace[-2]
+        file.write("* 位移距离：%.2fm\n"
+                   % sqrt((start_point[0] - end_point[0]) ** 2 + (start_point[1] - end_point[1]) ** 2))
+        file.write("* 平均速度：%.2fm/s\n" % item.average_speed)
+        # file.write("%f, %f; %f, %f\n" % (end_point[0], end_point[1], start_point[0], start_point[1]))
 
     def save_dead_items(self):
         for each in self.died_items:
