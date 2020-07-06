@@ -109,6 +109,8 @@ class Video(object):
         file.write("* 视频名；%s\n" % self.video_name)
         file.write("* 总时长；%s, FPS：%s\n" % (time_length, self.fps))
         file.write("* 总通过数：%d\n" % len(self.died_items))
+        for each in self.died_items:
+            file.write("id%d\n" % each.identification)
         file.close()
 
     def save_dead_item(self, item):
@@ -125,7 +127,8 @@ class Video(object):
         end_point = item.real_trace[-2]
         file.write("* 位移距离：%.2fm\n"
                    % sqrt((start_point[0] - end_point[0]) ** 2 + (start_point[1] - end_point[1]) ** 2))
-        file.write("* 平均速度：%.2fm/s\n" % item.average_speed)
+        file.write("* 平均速度：%.2fm/s <-> %.2fkm/h\n" % (item.average_speed, item.average_speed * 3.6))
+        file.close()
         # file.write("%f, %f; %f, %f\n" % (end_point[0], end_point[1], start_point[0], start_point[1]))
 
     def save_dead_items(self):

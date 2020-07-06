@@ -164,6 +164,6 @@ def main(video_input: str):
 
 
 if __name__ == '__main__':
-    # main('video-02.mp4')
+    main('video-02.mp4')
     # main('video-01.avi')
-    main('video-03.avi')
+    # main('video-03.avi')
