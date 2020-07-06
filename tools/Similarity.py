@@ -151,11 +151,11 @@ def classify_hist_with_split(image1, image2, size=(256, 256)):
         for im1, im2 in zip(sub_image1, sub_image2):
             sub_data += calculate(im1, im2)
         sub_data = sub_data / 3
-        if sub_data == 1.0:
-            sub_data = [1.0]
+        if sub_data == 1:
+            sub_data = [1]
         return sub_data
     except Exception:
-        return -1
+        return [-1]
 
 
 def cmp_hash(hash1, hash2):

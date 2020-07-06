@@ -16,8 +16,9 @@ class Item(object):
         # self.location = Geometry.Point(coord_x, coord_y)
         self.rect = Geometry.Rect(coord_x, coord_y, width, height)
         self.break_count = 0
-        self.tracker = cv.TrackerMOSSE_create()
-        self.tracker.init(cv_frame, (coord_x, coord_y, width, height))
+        # self.tracker = cv.TrackerMOSSE_create()
+        # self.tracker.init(cv_frame, (coord_x, coord_y, width, height))
+        self.tracker = Tracker.Tracker(cv_frame, (coord_x, coord_y, width, height))
         self.trace = []
         self.real_trace = []
         self.move_length = []
@@ -62,10 +63,44 @@ class Item(object):
                 box = [0, 0, 0, 0]
                 # print(self.trace[len(self.trace) - 1][0] * 2 - self.trace[len(self.trace) - 2][0])
                 if self.lost_times <= 15:
-                    box[0] = self.trace[len(self.trace) - 1][0] * 2 - self.trace[len(self.trace) - 2][0]
-                    box[1] = self.trace[len(self.trace) - 1][1] * 2 - self.trace[len(self.trace) - 2][1]
-                    box[2] = self.trace[len(self.trace) - 1][2]
-                    box[3] = self.trace[len(self.trace) - 1][3]
+                    if len(self.trace) >= 5:
+                        trace_box = self.trace[len(self.trace) - 1]
+                        trace_boxes = []
+                        mids = []
+                        # diffs = []
+                        sum0 = 0
+                        sum1 = 0
+                        for i in range(1, 6):
+                            trace_boxes.append(self.trace[len(self.trace) - i])
+                            # print(len(self.trace), i)
+                            rect = Geometry.Rect(trace_boxes[i - 1][0], trace_boxes[i - 1][1],
+                                                 trace_boxes[i - 1][2], trace_boxes[i - 1][3])
+                            mids.append(rect.get_mid_point().get_coord())
+                        for i in range(4):
+                            diff = [mids[i][0] * 2 - mids[i + 1][0], mids[i][1] * 2 - mids[i + 1][1]]
+                            # diffs.append(diff)
+                            sum0 += diff[0]
+                            sum1 += diff[1]
+                        avrg0 = int(sum0) // 4
+                        avrg1 = int(sum1) // 4
+                        box[0] = avrg0 - trace_box[2] / 2
+                        box[1] = avrg1 - trace_box[3] / 2
+                        pass
+                    else:
+                        trace_box1 = self.trace[len(self.trace) - 1]
+                        trace_box2 = self.trace[len(self.trace) - 2]
+                        rect1 = Geometry.Rect(trace_box1[0], trace_box1[1], trace_box1[2], trace_box1[3])
+                        rect2 = Geometry.Rect(trace_box2[0], trace_box2[1], trace_box2[2], trace_box2[3])
+                        mid1 = rect1.get_mid_point().get_coord()
+                        mid2 = rect2.get_mid_point().get_coord()
+                        box[0] = mid1[0] * 2 - mid2[0]
+                        box[1] = mid1[1] * 2 - mid2[1]
+                        box[0] -= trace_box1[2] / 2
+                        box[1] -= trace_box1[3] / 2
+                        # box[0] = self.trace[len(self.trace) - 1][0] * 2 - self.trace[len(self.trace) - 2][0]
+                        # box[1] = self.trace[len(self.trace) - 1][1] * 2 - self.trace[len(self.trace) - 2][1]
+                        box[2] = self.trace[len(self.trace) - 1][2]
+                        box[3] = self.trace[len(self.trace) - 1][3]
             else:
                 self.lost_times = 0
         self.rect.location = Geometry.Point(int(box[0]), int(box[1]))

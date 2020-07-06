@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from recognition import Items, Video
-from tools import Display, Geometry, Similarity, Hog
+from tools import Display, Geometry, Similarity, Hog, Tracker
 
 
 def main(video_input: str):
@@ -60,10 +60,10 @@ def main(video_input: str):
                                     break
                                 if similarity[0] >= 0.5 and 0.3 < each.rect.size() / (w * h) < 3.33 \
                                         and 0.6 < (each.rect.width/each.rect.height) / (w/h) < 1.67:
-                                    each.tracker = cv2.TrackerMOSSE_create()
-                                    each.tracker.init(frame.cv_frame, (x, y, w, h))
+                                    each.tracker = Tracker.Tracker(frame.cv_frame, (x, y, w, h))
+                                    # each.tracker.init(frame.cv_frame, (x, y, w, h))
                                     each.remain = True
-                                elif similarity < 0.2:
+                                elif similarity[0] < 0.2:
                                     time = video.get_time(i)
                                     item = Items.Item(item_count, x, y, w, h, time, frame.cv_frame)
                                     item.remain = True
@@ -83,7 +83,7 @@ def main(video_input: str):
 
         # get updated location of objects in subsequent frames
         for each in video.items:
-            success, box = each.update_tracker(frame_blur, camera)
+            success, box = each.update_tracker(frame.cv_frame, camera)
             if Geometry.Rect.has_inside(boundary, Geometry.Rect(box[0], box[1], box[2], box[3]).get_mid_point()):
                 if frame.serial_num % 10 != 0:
                     each.remain = True
