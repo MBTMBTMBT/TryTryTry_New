@@ -1,8 +1,8 @@
 # coding=utf8
 import cv2 as cv
-
-from tools import *
 import math
+from tools import *
+from recognition import clpr_entry
 
 
 class Item(object):
@@ -61,7 +61,7 @@ class Item(object):
             if len(self.trace) >= 2:
                 box = [0, 0, 0, 0]
                 # print(self.trace[len(self.trace) - 1][0] * 2 - self.trace[len(self.trace) - 2][0])
-                if self.lost_times <= 15:
+                if self.lost_times <= 10:
                     box[0] = self.trace[len(self.trace) - 1][0] * 2 - self.trace[len(self.trace) - 2][0]
                     box[1] = self.trace[len(self.trace) - 1][1] * 2 - self.trace[len(self.trace) - 2][1]
                     box[2] = self.trace[len(self.trace) - 1][2]
@@ -147,13 +147,17 @@ class Item(object):
         self.end_time = time_in_ms
 
     @staticmethod
+    def predict_plate(image) -> str:
+        return clpr_entry.clpr_main(image)
+
+    @staticmethod
     def are_overlapping(item1, item2) -> bool:
         return Geometry.Rect.are_overlapping(item1.rect, item2.rect)
 
     @staticmethod
     def set_all_not_overlapping(items: []):
         for each in items:
-            each.are_overlapping = False
+            each.is_overlapping = False
 
     @staticmethod
     def overlap_match(items: []):
@@ -161,12 +165,12 @@ class Item(object):
             for b in items:
                 if a is b:
                     continue
-                elif a.are_overlapping and b.are_overlapping:
-                    continue
+                # elif a.is_overlapping and b.is_overlapping:
+                #     continue
                 else:
                     if Item.are_overlapping(a, b):
-                        a.are_overlapping = True
-                        b.are_overlapping = True
+                        a.is_overlapping = True
+                        b.is_overlapping = True
 
     def __str__(self):
         return "ID: %d, Item of rect with " % self.identification + str(self.rect)

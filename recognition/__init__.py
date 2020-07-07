@@ -1,1 +1,1 @@
-__all__ = ["Items", "Video"]
+__all__ = ["Items", "Video", "clpr_entry"]

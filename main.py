@@ -1,5 +1,4 @@
 import cv2
-import numpy as np
 from recognition import Items, Video
 from tools import Display, Geometry, Similarity, Hog
 
@@ -35,11 +34,13 @@ def main(video_input: str):
         Items.Item.overlap_match(video.items)
 
         for c in contours:
-            if shape[0] * shape[1] / 2 > cv2.contourArea(c) > 3000:
+            if shape[0] * shape[1] / 4 > cv2.contourArea(c) > 3000:
                 (x, y, w, h) = cv2.boundingRect(c)
+                if not 2 > w / h > 0.4:
+                    continue
                 if Geometry.Rect.has_inside(boundary, Geometry.Rect(x, y, w, h).get_mid_point()):
-                    if w / h >= 2:
-                        continue
+                    # if w / h >= 2:
+                        # continue
                     # cv2.rectangle(frame.cv_frame, (x, y), (x + w, y + h), (255, 255, 255), 2)
                     for each in video.items:
                         coord = each.rect.get_coord()
@@ -58,11 +59,11 @@ def main(video_input: str):
                                 if similarity == -1:
                                     break
                                 if similarity[0] >= 0.5 and 0.3 < each.rect.size() / (w * h) < 3.33 \
-                                        and 0.6 < (each.rect.width/each.rect.height) / (w/h) < 1.67:
+                                        and 0.5 < (each.rect.width/each.rect.height) / (w/h) < 2:
                                     each.tracker = cv2.TrackerMOSSE_create()
                                     each.tracker.init(frame.cv_frame, (x, y, w, h))
                                     each.remain = True
-                                elif similarity < 0.2:
+                                elif similarity < 0.4:
                                     time = video.get_time(frame_count)
                                     item = Items.Item(item_count, x, y, w, h, time, frame.cv_frame)
                                     item.remain = True
@@ -80,9 +81,10 @@ def main(video_input: str):
                         item_count += 1
                         cv2.rectangle(copy, (x, y), (x + w, y + h), (255, 255, 0), 2)
 
+        Items.Item.set_all_not_overlapping(video.items)
         # get updated location of objects in subsequent frames
         for each in video.items:
-            success, box = each.update_tracker(frame_blur, camera)
+            success, box = each.update_tracker(frame.cv_frame, camera)
             if Geometry.Rect.has_inside(boundary, Geometry.Rect(box[0], box[1], box[2], box[3]).get_mid_point()):
                 if frame.serial_num % 10 != 0:
                     each.remain = True
@@ -135,6 +137,8 @@ def main(video_input: str):
                 th_hog.start()
                 '''
                 each.display_quick_shots()
+                # for pic in each.quick_shots:
+                    # print(Items.Item.predict_plate(pic))
         video.items = new_items
 
         for each in video.items:
@@ -167,3 +171,4 @@ if __name__ == '__main__':
     main('video-02.mp4')
     # main('video-01.avi')
     # main('video-03.avi')
+    # main('MAH00043.MP4')
