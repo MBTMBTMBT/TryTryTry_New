@@ -69,7 +69,7 @@ def contour_cutting(plate_img, thre_img, color):
         plate_charnum = 8
     else:  # 蓝色和黄色车牌是7位字符长
         plate_charnum = 7
-    print("cc-1:number of charactors of this plate should be ", plate_charnum)
+    # print("cc-1:number of charactors of this plate should be ", plate_charnum)
 
     # ---------------
     # -2- 处理字母数字
@@ -94,7 +94,7 @@ def contour_cutting(plate_img, thre_img, color):
 
     # 如果len(candidate_contours) == 0，说明thre_img不是车牌，返回空的chars
     if len(candidate_contours) == 0:
-        print("Not a true plate. Go to next one.")
+        # print("Not a true plate. Go to next one.")
         chars = []
         return chars
 
@@ -119,7 +119,7 @@ def contour_cutting(plate_img, thre_img, color):
 
     # 如果len(char_rect) < plate_charnum-1-2，说明符合字符的字符块少于车牌字符数，应该不是车牌，返回空的chars
     if len(char_rect) < plate_charnum-1-2:  # 允许有个别字符粘连的可能性，太短就认为不是了，舍弃并返回
-        print("The number of charactors found is too little. May not be a true plate. Go to next one.")
+        # print("The number of charactors found is too little. May not be a true plate. Go to next one.")
         chars = []
         return chars
     else:  # 处理可能的字符粘连情况。  京NE1246，鲁LD9016，鲁Q521MZ，蒙A277EP
@@ -144,14 +144,14 @@ def contour_cutting(plate_img, thre_img, color):
             if verifychars(w, h, minwidth=2, maxwidth=round(width / plate_charnum),
                            maxheight=height):  # 第一次仅筛选字母数字，不含汉字, =3
                 candidate_contours.append(contour)
-        print("cc-2:2-len(candidate_contours) = ", len(candidate_contours))
+        # print("cc-2:2-len(candidate_contours) = ", len(candidate_contours))
         char_rect = []
         for contour in candidate_contours:
             x, y, w, h = cv2.boundingRect(contour)
             char_rect.append([x, y, w, h])  # 保存候选轮廓外包矩形尺寸数据
             cv2.rectangle(plate_img, (x, y), (x + w, y + h), (0, 255, 255), 1)
             cv2.imshow("cc-2:2-plate_img", plate_img)
-        print("cc-2:plate_charnum, 2-len(char_rect) = ", plate_charnum, len(char_rect))
+        # print("cc-2:plate_charnum, 2-len(char_rect) = ", plate_charnum, len(char_rect))
         # cv2.waitKey(0)
 
         # 如果字符块还是少，则请人工处理吧
@@ -190,23 +190,23 @@ def contour_cutting(plate_img, thre_img, color):
         i += 1
     avg_dist = int(sum_d / (min(plate_charnum, len(char_rect))-1-2))
     avg_w = int(sum_w / (min(plate_charnum, len(char_rect))-1-2))
-    print("cc-2:avg_dist, avg_w, list_dist, list_posi = ", avg_dist, avg_w, list_dist, list_posi)
+    # print("cc-2:avg_dist, avg_w, list_dist, list_posi = ", avg_dist, avg_w, list_dist, list_posi)
     i = 0
     while i < min(plate_charnum-1, len(char_rect)) - 1:  # i < len(char_rect) - 1
         if list_dist[i] <= int(avg_dist*0.8) or list_dist[i] > int(avg_dist*2.0):  # 经验值：*0.8, *2.0
             char_rect.pop(i)
-            print("cc-2:char_rect["+str(i)+"] was removed due to distance")
+            # print("cc-2:char_rect["+str(i)+"] was removed due to distance")
             i += 1
             continue
         x, y, w, h = char_rect[i]
-        print("cc-2:x, y, w, h = ", x, y, w, h)
-        print("cc-2:avg_w, int(avg_w*0.6), w, int(avg_w*0.8)", avg_w, int(avg_w*0.5), w, int(avg_w*0.7))
+        # print("cc-2:x, y, w, h = ", x, y, w, h)
+        # print("cc-2:avg_w, int(avg_w*0.6), w, int(avg_w*0.8)", avg_w, int(avg_w*0.5), w, int(avg_w*0.7))
         # 只检查后1位就可以了。再往前检查出错可能性较大，因为经验公式适应性不好:-(
         if i < 1 and avg_w*0.7 < w < int(avg_w*0.8):  # 排除比“1”宽且比平均宽度*0.8小的非字母数字 !!!!!!!!!!!!!!
             char_rect.pop(i)
-            print("cc-2:char_rect[" + str(i) + "] was removed due to charactor's width")
+            # print("cc-2:char_rect[" + str(i) + "] was removed due to charactor's width")
         i += 1
-    print("cc-2:=len(char_rect) = ", len(char_rect))
+    # print("cc-2:=len(char_rect) = ", len(char_rect))
 
     # 字母数字的个数超过车牌的字母数字的个数，检查车牌尾部是否有其他图案插入
     if len(char_rect) > plate_charnum:  # 可能有非字母数字插入到char_rect列表中了，很可能是车牌尾部的图案
@@ -221,14 +221,14 @@ def contour_cutting(plate_img, thre_img, color):
         # cv2.waitKey(0)
         nonzero = cv2.countNonZero(char_img)
         area = w * h  # w * h
-        print("cc-2:nonzero, area, nonzero/area = ", nonzero, area, nonzero/area)
+        # print("cc-2:nonzero, area, nonzero/area = ", nonzero, area, nonzero/area)
         if nonzero/area > 0.75:  # 经验值:0.65 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             char_rect.pop(0)
 
     # 至此，字母数字已经检查完毕，len(char_rect)应当至少不小于plate_charnum - 1，
     # 否则可能有字母数字漏掉了。此图片应是真车牌，但分割失败了，报错并处理下一个。
     if len(char_rect) < plate_charnum - 1:
-        print("It's a true plate, but doing segmentation failed. Please check later. Go to next one this time.")
+        # print("It's a true plate, but doing segmentation failed. Please check later. Go to next one this time.")
         chars = []
         return chars
 

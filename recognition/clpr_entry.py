@@ -160,7 +160,7 @@ def clpr_main(source_img):
         except:
             result['归属'] = '未知'
 
-    print(result)
+    # print(result)
     cv2.destroyAllWindows()
     return result
 

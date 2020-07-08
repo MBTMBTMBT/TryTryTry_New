@@ -246,7 +246,7 @@ def location(source_img):
     # -5- 对card_imgs（plate）中候选图判断颜色，只有蓝色、黄色和绿色记入colors
     #
     colors, plates = color_judge(card_imgs)
-    print("L-5:len(plates), colors = ", len(plates), colors)
+    # print("L-5:len(plates), colors = ", len(plates), colors)
 
     k = 0
     while k < len(plates):
@@ -294,7 +294,7 @@ def location(source_img):
 
         # 本程序的两个正常出口之一。不需要用颜色再做定位，可以进行分割了。
         if nz/5920 > 0.91:  # 此图不需要处理，next one （如果此前截图不全，将影响后面分割和识别。是不是不转？？？？）
-            print("L-6:no color locating needed further. go to next one.")
+            # print("L-6:no color locating needed further. go to next one.")
 
             # 统一车牌输出的尺寸大小(144,33)
             plate = cv2.resize(plate, (148, 40), interpolation=cv2.INTER_AREA)
@@ -344,7 +344,7 @@ def location(source_img):
 
         # 如果没有轮廓len(candidate_contours) == 0，则舍弃；否则继续下面处理
         if len(candidate_contours) == 0:
-            print("L-6:len(candidate_contours)==0, not a true plate. go to next one.")
+            # print("L-6:len(candidate_contours)==0, not a true plate. go to next one.")
             i += 1
             continue
         # 否则，len(candidate_contours) == 1，继续下面处理
@@ -380,7 +380,7 @@ def location(source_img):
 
         # 如果没有轮廓len(cand_cont) == 0，则舍弃；否则继续下面处理
         if len(cand_cont) == 0:
-            print("L-6:it's impossible for len(cand_cont)==0. please set 'err' bigger !")
+            # print("L-6:it's impossible for len(cand_cont)==0. please set 'err' bigger !")
             i += 1
             continue
 
@@ -427,7 +427,7 @@ def location(source_img):
 
         # 如果没有轮廓len(ca_ct) == 0，则舍弃；否则继续下面处理
         if len(ca_ct) == 0:
-            print("L-6:it's impossible for len(ca_ct)==0. please set 'err' bigger !")
+            # print("L-6:it's impossible for len(ca_ct)==0. please set 'err' bigger !")
             i += 1
             continue
 
@@ -455,11 +455,12 @@ def location(source_img):
     # print("L-6:len(plate_imgs), len(plate_colors) = ", len(plate_imgs), len(plate_colors))
 
     if len(plate_imgs) == 0:
-        print("No any license plates are found :( -- clpr_location")
+        # print("No any license plates are found :( -- clpr_location")
         # exit(2)
         return None, None
     else:
-        print("Total " + str(len(plate_imgs)) + " plates or plates-liked are found -- clpr_location")
+        # print("Total " + str(len(plate_imgs)) + " plates or plates-liked are found -- clpr_location")
+        pass
     return plate_imgs, plate_colors
 
 
