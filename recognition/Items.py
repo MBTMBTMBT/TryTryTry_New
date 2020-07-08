@@ -147,8 +147,14 @@ class Item(object):
         self.end_time = time_in_ms
 
     @staticmethod
-    def predict_plate(image) -> str:
-        return clpr_entry.clpr_main(image)
+    def predict_plate(image) -> (bool, str):
+        try:
+            rst = clpr_entry.clpr_main(image)
+            if rst == '':
+                return False, rst
+            return True, rst
+        except:
+            return False, ''
 
     @staticmethod
     def are_overlapping(item1, item2) -> bool:

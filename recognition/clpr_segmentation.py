@@ -11,7 +11,7 @@ def verifychars(w, h, minwidth, maxwidth, maxheight):
     if w == 0 or h == 0:
         return False
 
-    minheight = 20  # 20
+    minheight = maxheight*0.4  # 20
     # maxwidth = 22  # 148/7 = 21.14
     # print("vc-1:minheight, h, maxheight = ", minheight, h, maxheight)
     # print("vc-2:minwidth, w, maxwidth = ", minwidth, w, maxwidth)
@@ -30,20 +30,39 @@ def contour_cutting(plate_img, thre_img, color):
     # ----------
     # -1- 预处理
     #
-    cv2.imshow("cc-2:0plate_img", plate_img)
-    cv2.imshow("cc-2:0thre_img", thre_img)
+    # cv2.imshow("cc-1:0-plate_img", plate_img)
+    # cv2.imshow("cc-1:0-thre_img", thre_img)
     orig_height, orig_width = thre_img.shape[:2]
     height = orig_height
     width = orig_width
 
-    # 皖A87271.jpg 不能画线！！！
     # 为了隔断螺钉与字符的连接，画上边界黑线
     cv2.line(thre_img, (0, 0), (width, 0), (0, 0, 0), 1)  # 2
     # cv2.imshow("cc-1:---thre_img", thre_img)
     # 为了隔断螺钉与字符的连接，画下边界黑线
-    cv2.line(thre_img, (0, height), (width, height), (0, 0, 0), 1)  # 2
-    cv2.imshow("cc-1:___thre_img", thre_img)
+    cv2.line(thre_img, (0, height-1), (width, height-1), (0, 0, 0), 1)  # 2
+    # cv2.imshow("cc-1:___thre_img", thre_img)
+
+    close_img = thre_img
+
+    # 发现有少数图片有字符粘连现象，故增加了图像腐蚀和膨胀。不知有没有副作用？？？
+    kernel = np.ones((3, 3), np.uint8)
+    close_img = cv2.erode(close_img, kernel, iterations=1)
+    # cv2.imshow("L-2:erosion", close_img)
+    close_img = cv2.dilate(close_img, kernel, iterations=1)
+    # cv2.imshow("L-2:dilate", close_img)
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 4))  # 避免有些字符上下分开
+    close_img = cv2.morphologyEx(close_img, cv2.MORPH_CLOSE, kernel, iterations=1)
+    # cv2.imshow("L-2:MORPH_CLOSE", close_img)
     # cv2.waitKey(0)
+
+    # 新增。为防止接收的小图片中字符存在竖裂纹，做一点预处理。  图片分辨率较好时不用，因为有可能会引起字符粘连！
+    # kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 1))  # 经验值(2,1)  12_0,25_01(<=2,1)
+    # close_img = cv2.morphologyEx(thre_img, cv2.MORPH_CLOSE, kernel, iterations=1)
+    # cv2.imshow("cc-1:___close_img", close_img)
+    # cv2.waitKey(0)
+
+    # 注意：下面用close_img去计算，用thre_img去截取！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
 
     # print("cc-1:height, width = ", height, width)
     if color == "green":  # 绿色车牌是8位字符长
@@ -57,7 +76,7 @@ def contour_cutting(plate_img, thre_img, color):
     #
 
     # 查找所有轮廓
-    contours, hierarchy = cv2.findContours(thre_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    contours, hierarchy = cv2.findContours(close_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
     # print("cc-2:len(contours) = ", len(contours))
 
     # 查找候选轮廓
@@ -70,11 +89,12 @@ def contour_cutting(plate_img, thre_img, color):
             candidate_contours.append(contour)
             # cv2.rectangle(plate_img, (x, y), (x + w, y + h), (0, 0, 255), 1)
             # cv2.imshow("cc-2:@plate_img", plate_img)
-    print("cc-2:1-len(candidate_contours) = ", len(candidate_contours))
+    # print("cc-2:1-len(candidate_contours) = ", len(candidate_contours))
     # cv2.waitKey(0)
 
     # 如果len(candidate_contours) == 0，说明thre_img不是车牌，返回空的chars
     if len(candidate_contours) == 0:
+        print("Not a true plate. Go to next one.")
         chars = []
         return chars
 
@@ -99,18 +119,24 @@ def contour_cutting(plate_img, thre_img, color):
 
     # 如果len(char_rect) < plate_charnum-1-2，说明符合字符的字符块少于车牌字符数，应该不是车牌，返回空的chars
     if len(char_rect) < plate_charnum-1-2:  # 允许有个别字符粘连的可能性，太短就认为不是了，舍弃并返回
+        print("The number of charactors found is too little. May not be a true plate. Go to next one.")
         chars = []
         return chars
     else:  # 处理可能的字符粘连情况。  京NE1246，鲁LD9016，鲁Q521MZ，蒙A277EP
         c2 = int(height - chravg_y - chravg_h) - 1
         c1 = miny - 1
-        cv2.line(thre_img, (0, c1), (width, c1), (0, 0, 0), 1)  # 上边线，经验值：2
-        cv2.line(thre_img, (0, height-c2), (width, height-c2), (0, 0, 0), 1)  # 下边线，经验值：2
-        cv2.imshow("cc-2:2lines-thre_img", thre_img)
+        # 防止c1和c2出界
+        if c1 < 0:
+            c1 = 0
+        if c2 < 0:
+            c2 = 0
+        cv2.line(close_img, (0, c1), (width, c1), (0, 0, 0), 1)  # 上边线，经验值：2
+        cv2.line(close_img, (0, height-c2), (width, height-c2), (0, 0, 0), 1)  # 下边线，经验值：2
+        # cv2.imshow("cc-2:2lines-thre_img", close_img)
         # cv2.waitKey(0)
 
         # 再次查找轮廓
-        contours, hierarchy = cv2.findContours(thre_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        contours, hierarchy = cv2.findContours(close_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         # 重新查找候选轮廓
         candidate_contours = []  # 存储合理的轮廓
         for contour in contours:
@@ -123,14 +149,14 @@ def contour_cutting(plate_img, thre_img, color):
         for contour in candidate_contours:
             x, y, w, h = cv2.boundingRect(contour)
             char_rect.append([x, y, w, h])  # 保存候选轮廓外包矩形尺寸数据
-            # cv2.rectangle(plate_img, (x, y), (x + w, y + h), (0, 0, 255), 1)
-            # cv2.imshow("cc-2:2-plate_img", plate_img)
-        # print("cc-2:plate_charnum, 2-len(char_rect) = ", plate_charnum, len(char_rect))
+            cv2.rectangle(plate_img, (x, y), (x + w, y + h), (0, 255, 255), 1)
+            cv2.imshow("cc-2:2-plate_img", plate_img)
+        print("cc-2:plate_charnum, 2-len(char_rect) = ", plate_charnum, len(char_rect))
         # cv2.waitKey(0)
 
         # 如果字符块还是少，则请人工处理吧
         if len(char_rect) < plate_charnum - 1 - 2:
-            print("cc-2:segmentation problem. please check")
+            print("cc-2:Segmentation problem. Please check")
             chars = []
             return chars
 
@@ -173,10 +199,10 @@ def contour_cutting(plate_img, thre_img, color):
             i += 1
             continue
         x, y, w, h = char_rect[i]
-        # print("cc-2:x, y, w, h = ", x, y, w, h)
-        # print("cc-2:avg_w, int(avg_w*0.6), w, int(avg_w*0.8)", avg_w, int(avg_w*0.5), w, int(avg_w*0.7))
+        print("cc-2:x, y, w, h = ", x, y, w, h)
+        print("cc-2:avg_w, int(avg_w*0.6), w, int(avg_w*0.8)", avg_w, int(avg_w*0.5), w, int(avg_w*0.7))
         # 只检查后1位就可以了。再往前检查出错可能性较大，因为经验公式适应性不好:-(
-        if i < 1 and int(avg_w*0.6) < w < int(avg_w*0.8):  # 排除比“1”宽且比平均宽度*0.7小的非字母数字 !!!!!!!!!!!!!!
+        if i < 1 and avg_w*0.7 < w < int(avg_w*0.8):  # 排除比“1”宽且比平均宽度*0.8小的非字母数字 !!!!!!!!!!!!!!
             char_rect.pop(i)
             print("cc-2:char_rect[" + str(i) + "] was removed due to charactor's width")
         i += 1
@@ -185,18 +211,26 @@ def contour_cutting(plate_img, thre_img, color):
     # 字母数字的个数超过车牌的字母数字的个数，检查车牌尾部是否有其他图案插入
     if len(char_rect) > plate_charnum:  # 可能有非字母数字插入到char_rect列表中了，很可能是车牌尾部的图案
         x, y, w, h = char_rect[0]
-
+        '''
         if y >= int(maxh - h):  # 调整y和h值
             y = y - int(maxh - h)
             h = maxh
+        '''
         char_img = thre_img[y:y + h, x:x + w]  # 字符两边略微加宽，左0，右0
         # cv2.imshow("cc-4:-char"+str(i), char_img)
         # cv2.waitKey(0)
         nonzero = cv2.countNonZero(char_img)
-        area = w * height  # w * h
-        # print("cc-2:nonzero, area, nonzero/area = ", nonzero, area, nonzero/area)
+        area = w * h  # w * h
+        print("cc-2:nonzero, area, nonzero/area = ", nonzero, area, nonzero/area)
         if nonzero/area > 0.75:  # 经验值:0.65 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             char_rect.pop(0)
+
+    # 至此，字母数字已经检查完毕，len(char_rect)应当至少不小于plate_charnum - 1，
+    # 否则可能有字母数字漏掉了。此图片应是真车牌，但分割失败了，报错并处理下一个。
+    if len(char_rect) < plate_charnum - 1:
+        print("It's a true plate, but doing segmentation failed. Please check later. Go to next one this time.")
+        chars = []
+        return chars
 
     char_imgs = []
     i = maxw = 0  # maxw为对字母数字统计的最大宽度
@@ -212,74 +246,15 @@ def contour_cutting(plate_img, thre_img, color):
         char_img = thre_img[y:y + h, x-1:x + w + 1]  # 字符两边略微加宽，左1，右1；y+h+1
         # cv2.imshow("cc-2:=char"+str(i), char_img)
         # cv2.waitKey(0)
+
         char_imgs.append(char_img)
         i += 1
-    thre_img = thre_img[0:height, 0:x]  # [y:y+h, 0:x]截取汉字这块，保留原始高度（上面汉字可能只截取了一小部分）
-    # cv2.imshow("cc-2:0Hanzi-thre_img", thre_img)
-    # cv2.waitKey(0)
 
-    # ---------------
-    # -3- 单独处理汉字
-    #
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 7))  # (1, 7)
-    thre_morph = cv2.morphologyEx(thre_img, cv2.MORPH_CLOSE, kernel, iterations=1)  # 增加垂直连接，如“黑,京”
-    # cv2.imshow("cc-3:1Hanzi-thre_morph", thre_morph)
-    # cv2.waitKey(0)
-    contours, hierarchy = cv2.findContours(thre_morph, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-    # print("cc-3:Hanzilen(contours) = ", len(contours))
-    cn_rect = []
-    for contour in contours:
-        x, y, w, h = cv2.boundingRect(contour)
-        cn_rect.append(([x, y, w, h]))
-    # print("cc-3:Hanzilen(contours) = ", len(cn_rect))
-
-    cn_rect.sort(key=lambda e: e[0], reverse=True)  # 按x坐标排序（倒序）
-
-    x, y, w, h = cn_rect[0]
-    print("cc-3:maxw, x, y, w, h = ", maxw, x, y, w, h)
-    if maxw - w > 2:  # 汉字比字母数字的最大宽度窄
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))  # (3, 3)够不够？
-        thre_morph = cv2.morphologyEx(thre_morph, cv2.MORPH_CLOSE, kernel, iterations=1)  # 增加水平连接
-        contours, hierarchy = cv2.findContours(thre_morph, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-    elif w - maxw > 2:  # 汉字比字母数字的最大宽度宽
-        thre_morph = thre_morph[y:y + h, x+w-maxw+1:x + w]
-        thre_img = thre_img[y:y + h, x + w - maxw + 1:x + w]  # thre_img一起改
-        # cv2.imshow("cc-3:-narrowHanzi", thre_morph)
-        # cv2.imshow("cc-3:=narrowHanzi", thre_img)
-        contours, hierarchy = cv2.findContours(thre_morph, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-    # else:  # 汉字宽度正常，那就增加垂直连接
-    #    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 5))  # (1, 3)
-    #    thre_morph = cv2.morphologyEx(thre_morph, cv2.MORPH_CLOSE, kernel, iterations=1)  # 增加垂直连接
-    #    cv2.imshow("cc-3:verticalHanzi", thre_morph)
-    #    contours, hierarchy = cv2.findContours(thre_morph, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-    # print("cc-3:Hanzilen(contours) = ", len(contours))
-
-    candidate_contours = []  # 存储合理的轮廓
-    for contour in contours:
-        x, y, w, h = cv2.boundingRect(contour)
-        # print("cc-3:x, y, w, h = ", x, y, w, h)
-        if verifychars(w, h, minwidth=maxw*0.6, maxwidth=round(width/plate_charnum), maxheight=height):  # 第二次筛选汉字，宽度放大:minwidth=maxw*0.6
-            candidate_contours.append(contour)
-            # print("cc-3:@x, y, w, h = ", x, y, w, h)
-            # cv2.rectangle(thre_morph, (x, y), (x + w, y + h), (255, 255, 255), 1)
-            # cv2.imshow("cc-3:C-thre_morph", thre_morph)
-
-    # print("cc-3:len(candidate_contours) = ", len(candidate_contours))
-    if len(candidate_contours) == 0:
-        print("Chinese charactor are not found. Please check! -- clpr_segmentation")
-        # exit(2)
-
-    # 计算汉字（可能左边还有其他图案）的坐标尺寸
-    char_rect = []
-    for contour in candidate_contours:
-        x, y, w, h = cv2.boundingRect(contour)
-        char_rect.append([x, y, w, h])
-
-    char_rect.sort(key=lambda e: e[0], reverse=True)  # 倒叙排序，保证第一个是汉字
-    x, y, w, h = char_rect[0]
-    char_img = thre_img[y:y + h, x:x + w]  # 取thre_img，而非thre_morph
+    # 分割汉字
+    # 按前面计算的字母数字的平均上下限度c1和c2的高度范围来截取汉字这块；宽度按字母数字统计的最大宽度截取
+    char_img = thre_img[c1:height-c2, x-1-maxw-2:x-1]  # [0:height, 0:x-1]保留原始高度（上面汉字可能只截取了一小部分）
     char_imgs.append(char_img)
-    cv2.imshow("cc-3:hanzi", char_img)
+    # cv2.imshow("cc-2:Hanzi-thre_img", char_img)
     # cv2.waitKey(0)
 
     # 把字符按正序放入chars中，并返回
@@ -297,7 +272,7 @@ if __name__ == '__main__':
     plate_img = cv2.imdecode(np.fromfile(".\\plates\\license_64_green.jpg",
                                          dtype=np.uint8), cv2.IMREAD_COLOR)  # 读有中文名的方法。cv2.imread()读中文名会报错
 
-    # 锐化处理; 转灰度图s
+    # 锐化处理; 转灰度图
     kernel = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]], np.float32)  # 锐化
     card_img = cv2.filter2D(plate_img, -1, kernel=kernel)
     gray_img = cv2.cvtColor(card_img, cv2.COLOR_BGR2GRAY)

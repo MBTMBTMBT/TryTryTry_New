@@ -16,7 +16,8 @@ def verifysizes(rotated_rect, err):
     min_aspect = aspect - aspect * err  # 0.4->2.22; 0.5->1.85; 0.6->1.48; 0.7->1.11; 0.8->0.74; 0.9->0.37
     max_aspect = aspect + aspect * err  # 0.4->5.18; 0.5->5.55; 0.6->5.92; 0.7->6.29; 0.8->6.66; 0.9->7.03
 
-    min_area = 15 * aspect * 15  # 15, 707.12999
+    # min_area = 15 * aspect * 15  # 15, 707.12999
+    min_area = 10 * aspect * 10  # 10, 370 （4_0.png）
     max_area = 148 * aspect * 148  # 125, 49106.24999
     rect_width, rect_height = rotated_rect[1]
     if rect_width == 0 or rect_height == 0:
@@ -27,8 +28,8 @@ def verifysizes(rotated_rect, err):
     if aspect < 1:
         aspect = 1 / aspect
 
-    # print("v_s-1:min_area <= area <= max_area = ", int(min_area), int(area), int(max_area))
-    # print("v_s-2:min_aspect <= aspect <= max_aspect = ", int(min_aspect), int(aspect), int(max_aspect))
+    # print("VS-1:min_area <= area <= max_area = ", int(min_area), int(area), int(max_area))
+    # print("VS-2:min_aspect <= aspect <= max_aspect = ", int(min_aspect), int(aspect), int(max_aspect))
     if min_area <= area <= max_area and min_aspect <= aspect <= max_aspect:
         return True
     else:
@@ -91,16 +92,21 @@ def location(source_img):
     # 在查找垂直边之前，像将彩色图转换成灰度图，去除可能的噪声（由摄像机、其他环境噪声产生的）。
 
     # -----------------------------------------
-    # -1- 整理图像尺寸。如果过大，则按比例缩小
+    # -1- 整理图像尺寸。如果过大，则按比例缩小；反之，则放大
     #
     # 注意：-2-中的参数是按 MAX_WIDTH=500 时调试的。
     # 如果调大此数，需要重新调整参数！！！
     # 适当调大此数，可有助提高识别率
-    MAX_WIDTH = 500  # 500 or 1000 *******
+    MAX_WIDTH = 700  # 500 or 1000 *******
     rows, cols = source_img.shape[:2]
-    if cols > MAX_WIDTH:
+    if cols > MAX_WIDTH:  # 图片过大，则缩小
         change_rate = MAX_WIDTH / cols
         source_img = cv2.resize(source_img, (MAX_WIDTH, int(rows * change_rate)), interpolation=cv2.INTER_AREA)
+    else:
+        if cols < MAX_WIDTH:  # 图片过小，则放大
+            change_rate = MAX_WIDTH / cols
+            source_img = cv2.resize(source_img, (MAX_WIDTH, int(rows * change_rate)),
+                                    interpolation=cv2.INTER_CUBIC)  # _CUBIC, _LINEAR, _NEAREST, _AREA, _LANCZOS4
     # cv2.imshow("L-1:source_img", source_img)
     # cv2.waitKey(0)
 
@@ -127,17 +133,17 @@ def location(source_img):
     close_img = cv2.morphologyEx(threshhold_img, cv2.MORPH_CLOSE, kernel, iterations=1)
     # cv2.imshow("L-2:close_img", close_img)
 
-    # 增加了图像腐蚀和膨胀的次数（经验值3次）
+    # 增加了图像腐蚀和膨胀的次数（经验值3次）；对于小图片（200，300左右）经验值2次
     kernel = np.ones((3, 3), np.uint8)
-    close_img = cv2.erode(close_img, kernel, iterations=3)
+    close_img = cv2.erode(close_img, kernel, iterations=2)
     # cv2.imshow("L-2:erosion", close_img)
-    close_img = cv2.dilate(close_img, kernel, iterations=3)
+    close_img = cv2.dilate(close_img, kernel, iterations=2)
     # cv2.imshow("L-2:dilate", close_img)
-    # cv2.waitKey(0)
+    #cv2.waitKey(0)
 
-    # 新加！！！!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (20, 3))  # 经验值(22,3),苏BD00008<=20
-    close_img = cv2.morphologyEx(close_img, cv2.MORPH_CLOSE, kernel, iterations=1)
+    # 新加！！！!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!-31_0:no!-
+    # kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (20, 3))  # 经验值(22,3),苏BD00008<=20
+    # close_img = cv2.morphologyEx(close_img, cv2.MORPH_CLOSE, kernel, iterations=1)
     # cv2.imshow("L-2:2close_img", close_img)
     # cv2.waitKey(0)
 
@@ -167,7 +173,7 @@ def location(source_img):
     candidate_contours = []  # 存储合理的轮廓
     for contour in contours:
         rot_rect = cv2.minAreaRect(contour)
-        if verifysizes(rot_rect, err=1.1):  # 0.9, 1.3, 苏BD00008(1.1)
+        if verifysizes(rot_rect, err=1.2):  # 1.1, 0.9, 1.3, 苏BD00008(1.1), 11_0(1.2)
             candidate_contours.append(contour)
             # box = cv2.boxPoints(rot_rect)  # 以下四行只做调试用！！！！！！
             # box = np.int0(box)
@@ -218,7 +224,7 @@ def location(source_img):
         # print("L-4:len(_cont) = ", len(_cont))
         for cnt in _cont:
             new_rect = cv2.minAreaRect(cnt)
-            if verifysizes(new_rect, err=0.9):  # 0.9, 1.3
+            if verifysizes(new_rect, err=1.2):  # 0.9, 1.3, 11_0(1.2)
                 new_x, new_y = new_rect[0]
                 new_width, new_height = new_rect[1]
                 # print("L-4:new_x, new_y, new_width, new_height = ", new_x, new_y, new_width, new_height)
@@ -237,14 +243,14 @@ def location(source_img):
     # cv2.waitKey(0)
 
     # ------------------------------------------------------------------
-    # -5- 对card_imgs（plates）中候选图判断颜色，只有蓝色、黄色和绿色记入colors
+    # -5- 对card_imgs（plate）中候选图判断颜色，只有蓝色、黄色和绿色记入colors
     #
     colors, plates = color_judge(card_imgs)
     print("L-5:len(plates), colors = ", len(plates), colors)
 
     k = 0
     while k < len(plates):
-        cv2.imshow("L-5:p"+str(k), plates[k])
+        # cv2.imshow("L-5:pic"+str(k), plates[k])
         k += 1
     # cv2.waitKey(0)
 
@@ -256,7 +262,7 @@ def location(source_img):
     plate_colors = []
     for plate in plates:
         plate_copy = plate.copy()
-        cv2.imshow("L-6:plate"+str(i), plate)
+        # cv2.imshow("L-6:plate"+str(i), plate)
         # cv2.waitKey(0)
 
         # 高斯模糊，转HSV色彩空间
@@ -286,12 +292,13 @@ def location(source_img):
         nz = cv2.countNonZero(mask)
         # print("L-6:nz, nz/5920 = ", nz, nz/5920)
 
+        # 本程序的两个正常出口之一。不需要用颜色再做定位，可以进行分割了。
         if nz/5920 > 0.91:  # 此图不需要处理，next one （如果此前截图不全，将影响后面分割和识别。是不是不转？？？？）
             print("L-6:no color locating needed further. go to next one.")
 
             # 统一车牌输出的尺寸大小(144,33)
             plate = cv2.resize(plate, (148, 40), interpolation=cv2.INTER_AREA)
-            cv2.imshow("L-6:A-resize" + str(i), plate)
+            # cv2.imshow("L-6:A-resize" + str(i), plate)
             # cv2.waitKey(0)
 
             plate_imgs.append(plate)
@@ -313,7 +320,7 @@ def location(source_img):
         # cv2.imshow('L-6:thresh'+str(i), thre)
 
         # 闭操作
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (12, 3))  # 黑E99999<=14(.904),渝AN7968>=12,
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (20, 3))  # 黑E99999<=14(.904),渝AN7968>=12,
         binary = cv2.morphologyEx(thre, cv2.MORPH_CLOSE, kernel)
         # cv2.imshow('L-6:closed'+str(i), binary)
         # cv2.waitKey(0)
@@ -326,7 +333,7 @@ def location(source_img):
         candidate_contours = []
         for contour in contours:
             rot_rect = cv2.minAreaRect(contour)
-            if verifysizes(rot_rect, err=0.9):  # 0.4,   img0==>err=0.9
+            if verifysizes(rot_rect, err=1.2):  # 0.4,   img0==>err=0.9, 11_2(1.2)
                 candidate_contours.append(contour)
                 # box = cv2.boxPoints(rot_rect)
                 # box = np.int0(box)
@@ -435,9 +442,10 @@ def location(source_img):
         # cv2.imshow("L-6.1:getRectSubPix", plate)
         # cv2.waitKey(0)
 
+        # 本程序的两个正常出口之二。用颜色再做定位后，就可以进行分割了。
         # 统一车牌输出的尺寸大小(144,33)(105, 33)。最优尺寸???????????
         plate = cv2.resize(plate, (148, 40), interpolation=cv2.INTER_AREA)  # img,(列,行);(144,33)最优尺寸???
-        cv2.imshow("L-6:B-resize"+str(i), plate)
+        # cv2.imshow("L-6:B-resize"+str(i), plate)
         # cv2.waitKey(0)
 
         plate_imgs.append(plate)
@@ -449,6 +457,7 @@ def location(source_img):
     if len(plate_imgs) == 0:
         print("No any license plates are found :( -- clpr_location")
         # exit(2)
+        return None, None
     else:
         print("Total " + str(len(plate_imgs)) + " plates or plates-liked are found -- clpr_location")
     return plate_imgs, plate_colors
@@ -456,7 +465,7 @@ def location(source_img):
 
 if __name__ == '__main__':
     # 读取源图像文件
-    source_img = cv2.imdecode(np.fromfile(".\\Test\\img0.png", dtype=np.uint8),
+    source_img = cv2.imdecode(np.fromfile(".\\Test\\4_0.png", dtype=np.uint8),
                               cv2.IMREAD_COLOR)  # 读有中文名的方法。cv2.imread()读中文名，报错
 
     # 车牌定位，分割，颜色识别

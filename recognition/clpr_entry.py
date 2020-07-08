@@ -114,6 +114,8 @@ def clpr_main(source_img):
 
     # 车牌定位，车牌分割，车牌颜色识别
     card_imgs, colors = clpr_location.location(source_img)
+    if card_imgs is None or colors is None:
+        return ''
     print("location finished -- clpr_entry")
 
     '''

@@ -14,6 +14,7 @@ def main(video_input: str):
     rect_x = shape[1] // 12 * 2
     boundary = Geometry.Rect(rect_x, rect_y, shape[1] // 12 * 8, shape[0] // 12 * 6)
     item_count = 0
+    SMALLEST_FRAME_NUMBER_LIMIT = 10
     th_hog = None
 
     for frame_count in range(video.total_frames_num):
@@ -124,7 +125,7 @@ def main(video_input: str):
                         each.quick_shots = pics
 
             # item will be killed
-            elif len(each.trace) >= 20:
+            elif len(each.trace) >= SMALLEST_FRAME_NUMBER_LIMIT:
                 time = video.get_time(frame_count)
                 each.suicide(time)
                 video.died_items.append(each)
@@ -168,7 +169,8 @@ def main(video_input: str):
 
 
 if __name__ == '__main__':
-    main('video-02.mp4')
+    # main('video-02.mp4')
+    main('MAH00057.mp4')
     # main('video-01.avi')
     # main('video-03.avi')
-    # main('MAH00043.MP4')
+    # main('video-04.MP4')

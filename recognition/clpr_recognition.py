@@ -92,7 +92,7 @@ def ocr(card_imgs, colors):
             part_cards = clpr_segmentation.contour_cutting(copy_card_img, gray_img, color)  # copy_card_img原图
             # print("o-1:len(part_cards) = ", len(part_cards))
 
-            # 如果len(part_cards) == 0，说明是假车牌，不处理。跳转下一个
+            # 如果len(part_cards) == 0，说明是假车牌 或 真车牌分割错误，不处理。跳转下一个
             if len(part_cards) == 0:
                 continue
 
