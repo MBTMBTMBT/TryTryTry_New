@@ -146,6 +146,14 @@ class Video(object):
                    % sqrt((start_point[0] - end_point[0]) ** 2 + (start_point[1] - end_point[1]) ** 2))
         file.write("* 平均速度：%.2fm/s <-> %.2fkm/h\n" % (item.average_speed, item.average_speed * 3.6))
         file.close()
+        try:
+            file = open('%s\\id%d-plate\\plates.txt' % (self.video_name, item.identification), 'w')
+            count = 0
+            for plate_str in item.plate_strs:
+                file.write("%d: %s\n" % (count, plate_str))
+                count += 1
+        except FileNotFoundError:
+            pass
         # file.write("%f, %f; %f, %f\n" % (end_point[0], end_point[1], start_point[0], start_point[1]))
 
     # 对于每个出现在被追踪到的画面中并离开画面的移动物体，记录他们的各个参数

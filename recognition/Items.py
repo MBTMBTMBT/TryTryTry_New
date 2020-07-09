@@ -175,11 +175,12 @@ class Item(object):
                 self.plates[rst] = 1
             if target_video_path is not None:
                 try:
-                    os.mkdir(target_video_path + "//id%d-plate" % self.identification)
+                    os.mkdir(target_video_path + "\\id%d-plate" % self.identification)
                 except WindowsError:
                     pass
-                cv.imwrite(target_video_path + "//id%d-plate//plate-%d.png"
+                cv.imwrite(target_video_path + "\\id%d-plate\\plate-%d.png"
                            % (self.identification, self.plate_count), roi)
+                self.plate_count += 1
                 self.plate_strs.append(rst)
         max_num = 0
         max_key = rst

@@ -152,7 +152,7 @@ def main(video_input: str):
                 if len(each.trace) % QUICK_SHOT_TAKEN_FREQUENCY == 0:
                     shot = each.take_quick_shot(frame.cv_frame)
                     if each.rect.get_mid_point().get_coord()[1] >= video.picture_rect.height * PLATE_RECOGNITION_LINE:
-                        each.record_plate_recognition(shot)
+                        each.record_plate_recognition(shot, video.video_name)
                         # plate_success, plate_str = Items.Item.predict_plate(shot)
                         # print(plate_success, plate_str)
                     each.sort_quick_shots()
