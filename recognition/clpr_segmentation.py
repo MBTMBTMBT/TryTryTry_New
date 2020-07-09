@@ -27,10 +27,10 @@ def contour_cutting(plate_img, thre_img, color):
     #
     # 对定位后的候选车牌进行处理，将其中的字符（包括：汉字、字母和数字）分割提取出来。
 
-    # ----------
+    # -----------
     # -1- 预处理
     #
-    # cv2.imshow("cc-1:0-plate_img", plate_img)
+    cv2.imshow("cc-1:0-plate_img", plate_img)
     # cv2.imshow("cc-1:0-thre_img", thre_img)
     orig_height, orig_width = thre_img.shape[:2]
     height = orig_height
@@ -41,19 +41,14 @@ def contour_cutting(plate_img, thre_img, color):
     # cv2.imshow("cc-1:---thre_img", thre_img)
     # 为了隔断螺钉与字符的连接，画下边界黑线
     cv2.line(thre_img, (0, height-1), (width, height-1), (0, 0, 0), 1)  # 2
-    # cv2.imshow("cc-1:___thre_img", thre_img)
+    cv2.imshow("cc-1:___thre_img", thre_img)
 
     close_img = thre_img
 
-    # 发现有少数图片有字符粘连现象，故增加了图像腐蚀和膨胀。不知有没有副作用？？？
-    kernel = np.ones((3, 3), np.uint8)
-    close_img = cv2.erode(close_img, kernel, iterations=1)
-    # cv2.imshow("L-2:erosion", close_img)
-    close_img = cv2.dilate(close_img, kernel, iterations=1)
-    # cv2.imshow("L-2:dilate", close_img)
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 4))  # 避免有些字符上下分开
+    # 避免有些字符上下分开
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 3))  # 避免有些字符上下分开,(2, 4)
     close_img = cv2.morphologyEx(close_img, cv2.MORPH_CLOSE, kernel, iterations=1)
-    # cv2.imshow("L-2:MORPH_CLOSE", close_img)
+    # cv2.imshow("cc-1:MORPH_CLOSE", close_img)
     # cv2.waitKey(0)
 
     # 新增。为防止接收的小图片中字符存在竖裂纹，做一点预处理。  图片分辨率较好时不用，因为有可能会引起字符粘连！
@@ -71,32 +66,157 @@ def contour_cutting(plate_img, thre_img, color):
         plate_charnum = 7
     # print("cc-1:number of charactors of this plate should be ", plate_charnum)
 
-    # ---------------
-    # -2- 处理字母数字
+    # -----------------------------------
+    # -2- 处理字符上下粘连的情况（如果有的话）
     #
 
-    # 查找所有轮廓
+    # 第一次查找所有轮廓
     contours, hierarchy = cv2.findContours(close_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
     # print("cc-2:len(contours) = ", len(contours))
+    if len(contours) == 0:
+        print("Not a true plate. Go to next one.")
+        chars = []
+        return chars
+
+    # 查找候选轮廓
+    chravg_h = hh = c = 0  # chravg_h记录候选字符平均高度，为处理上下粘连情况备用
+    chravg_y = yy = 0  # chravg_y记录候选字符平均y值，为处理上下粘连情况备用
+    miny = height  # 记录候选字符最小y值，为处理上下粘连情况备用
+    candidate_contours = []  # 存储合理的轮廓
+    for contour in contours:
+        x, y, w, h = cv2.boundingRect(contour)
+        # cv2.rectangle(plate_img, (x, y), (x + w, y + h), (0, 255, 0), 1)
+        # cv2.imshow("cc-2:0-plate_img", plate_img)
+
+        # 允许两个字符粘连的情况发生（*2）: maxwidth=round(width/plate_charnum*2)
+        if verifychars(w, h, minwidth=2, maxwidth=round(width/plate_charnum*2), maxheight=height):
+            if y+h < height:  # 把类字符块触底的刨掉
+                c += 1  # 参与统计的类字符块个数
+                hh += h
+                yy += y
+                if y < miny:
+                    miny = y
+            candidate_contours.append(contour)
+            # cv2.rectangle(plate_img, (x, y), (x + w, y + h), (0, 255, 255), 1)
+            # cv2.imshow("cc-2:0-plate_img", plate_img)
+    # print("cc-2:len1-len(candidate_contours) = ", len(candidate_contours))
+    if len(candidate_contours) == 0:
+        print("Not a true plate. Go to next one.")
+        chars = []
+        return chars
+    if c != 0:
+        chravg_h = hh / c
+        chravg_y = yy / c
+    else:
+        print("Not a true plate. Go to next one.")
+        chars = []
+        return chars
+    # cv2.waitKey(0)
+
+    # 如果len(candidate_contours) < plate_charnum-1-2，说明符合字符的字符块少于车牌字符数，应该不是车牌，返回空的chars
+    if len(candidate_contours) < plate_charnum-1-2:  # 允许有个别字符粘连的可能性，太短就认为不是了，舍弃并返回
+        print("The number of charactors found is too little. May not be a true plate. Go to next one.")
+        chars = []
+        return chars
+    else:  # 处理可能的字符粘连情况。  京NE1246，鲁LD9016，鲁Q521MZ，蒙A277EP
+        c2 = int(height - chravg_y - chravg_h) - 1
+        c1 = miny - 1
+        # 防止c1和c2出界
+        if c1 < 0:
+            c1 = 0
+        if c2 < 0:
+            c2 = 0
+        cv2.line(close_img, (0, c1), (width, c1), (0, 0, 0), 1)  # 上边线，经验值：2
+        cv2.line(close_img, (0, height-c2), (width, height-c2), (0, 0, 0), 1)  # 下边线，经验值：2
+        # cv2.imshow("cc-2:top&bottomlines-thre_img", close_img)
+        # cv2.waitKey(0)
+
+    # ----------------------------------------------------------------------------------------
+    # -3- 处理两个字符粘连的情况（如果有的话）。当然，通常粘连只可能发生在“圆点”（汉字和第一个字母后）的右侧
+    #
+
+    # 第二次查找所有轮廓
+    contours, hierarchy = cv2.findContours(close_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    # print("cc-2:len(contours) = ", len(contours))
+    if len(contours) == 0:
+        print("Not a true plate. Go to next one.")
+        chars = []
+        return chars
 
     # 查找候选轮廓
     candidate_contours = []  # 存储合理的轮廓
     for contour in contours:
         x, y, w, h = cv2.boundingRect(contour)
-        # cv2.rectangle(plate_img, (x, y), (x + w, y + h), (0, 0, 255), 1)
-        # cv2.imshow("cc-2:0plate_img", plate_img)
-        if verifychars(w, h, minwidth=2, maxwidth=round(width/plate_charnum), maxheight=height):  # 第一次仅筛选字母数字，不含汉字, =3
-            candidate_contours.append(contour)
-            # cv2.rectangle(plate_img, (x, y), (x + w, y + h), (0, 0, 255), 1)
-            # cv2.imshow("cc-2:@plate_img", plate_img)
-    # print("cc-2:1-len(candidate_contours) = ", len(candidate_contours))
-    # cv2.waitKey(0)
+        # cv2.rectangle(plate_img, (x, y), (x + w, y + h), (0, 255, 0), 1)
+        # cv2.imshow("cc-3:0-plate_img", plate_img)
 
-    # 如果len(candidate_contours) == 0，说明thre_img不是车牌，返回空的chars
+        # 允许两个字符粘连的情况发生（*2）: maxwidth=round(width/plate_charnum*2)
+        if verifychars(w, h, minwidth=2, maxwidth=round(width/plate_charnum*2), maxheight=height):
+            if y+h < height:  # 把类字符块触底的刨掉
+                c += 1  # 参与统计的类字符块个数
+                hh += h
+                yy += y
+                if y < miny:
+                    miny = y
+            candidate_contours.append(contour)
+            # cv2.rectangle(plate_img, (x, y), (x + w, y + h), (0, 255, 0), 1)
+            # cv2.imshow("cc-3:0-plate_img", plate_img)
+    # print("cc-3:len1-len(candidate_contours) = ", len(candidate_contours))
     if len(candidate_contours) == 0:
-        # print("Not a true plate. Go to next one.")
+        print("Not a true plate. Go to next one.")
         chars = []
         return chars
+    # cv2.waitKey(0)
+
+    # 保存候选轮廓外包矩形尺寸数据
+    charset = []
+    for contour in candidate_contours:
+        x, y, w, h = cv2.boundingRect(contour)
+        charset.append([x, y, w, h])  # 保存候选轮廓外包矩形尺寸数据
+
+    # 按x坐标排序（倒序）
+    charset.sort(key=lambda e: e[0], reverse=True)
+    # print("cc-3:charset = ", charset)
+
+    # 估算字符的平均宽度，比实际计算（在粘连时）还准确一些
+    avgw = width / (plate_charnum + 3)
+
+    # 查找粘连的两个字符，如果找到，则用竖线隔开
+    i = 0
+    while i < plate_charnum - 2:
+        x, y, w, h = charset[i]
+        # print("cc-3:avgw, x, y, w, h = ", avgw, x, y, w, h)
+        if avgw*2*0.7 < w < avgw*2*1.5:  # 找到了粘连的两个字符
+            char_img = thre_img[y:y + h, x:x + w]
+            nonzero = cv2.countNonZero(char_img)
+            area = w * h
+            # print("cc-3:nonzero, area, nonzero/area = ", nonzero, area, nonzero / area)
+            if nonzero / area < 0.75:  # 经验值:0.65，防止是尾部的图形块
+                # 在粘连的两个字符中间画一个黑色竖线隔开（在close_img上)
+                cv2.line(close_img, (x+int(w/2), 0), (x+int(w/2), height - 1), (0, 0, 0), 1)
+        i += 1
+    # cv2.imshow("cc-3:adjoined", close_img)
+    # cv2.waitKey(0)
+
+    # ---------------
+    # -4- 处理字母数字
+    #
+
+    # 第三次查找所有轮廓
+    contours, hierarchy = cv2.findContours(close_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    # print("cc-4:len(contours) = ", len(contours))
+
+    # 再次查找候选轮廓
+    candidate_contours = []  # 存储合理的轮廓
+    for contour in contours:
+        x, y, w, h = cv2.boundingRect(contour)
+        # 不允许两个字符粘连的情况发生（上面已经解决了）: maxwidth=round(width/plate_charnum)
+        if verifychars(w, h, minwidth=2, maxwidth=round(width/plate_charnum), maxheight=height):  # 第一次仅筛选字母数字，不含汉字, =3
+            candidate_contours.append(contour)
+            # cv2.rectangle(plate_img, (x, y), (x + w, y + h), (255, 0, 0), 1)
+            # cv2.imshow("cc-4:1-plate_img", plate_img)
+    # print("cc-4:2-len(candidate_contours) = ", len(candidate_contours))
+    # cv2.waitKey(0)
 
     # 保存候选字符坐标尺寸
     chravg_h = hh = 0  # chravg_h记录候选字符平均高度，为下一段if语句中的else备用
@@ -114,51 +234,14 @@ def contour_cutting(plate_img, thre_img, color):
         # cv2.imshow("cc-2:plate_img", plate_img)
     chravg_h = hh / len(candidate_contours)
     chravg_y = yy / len(candidate_contours)
-    # print("cc-2:plate_charnum, len(char_rect) = ", plate_charnum, len(char_rect))
+    # print("cc-4:plate_charnum, len(char_rect) = ", plate_charnum, len(char_rect))
     # cv2.waitKey(0)
 
-    # 如果len(char_rect) < plate_charnum-1-2，说明符合字符的字符块少于车牌字符数，应该不是车牌，返回空的chars
-    if len(char_rect) < plate_charnum-1-2:  # 允许有个别字符粘连的可能性，太短就认为不是了，舍弃并返回
-        # print("The number of charactors found is too little. May not be a true plate. Go to next one.")
+    # 如果字符块还是少，则请人工处理吧
+    if len(char_rect) < plate_charnum - 1 - 2:
+        print("cc-4:Segmentation problem. Please check")
         chars = []
         return chars
-    else:  # 处理可能的字符粘连情况。  京NE1246，鲁LD9016，鲁Q521MZ，蒙A277EP
-        c2 = int(height - chravg_y - chravg_h) - 1
-        c1 = miny - 1
-        # 防止c1和c2出界
-        if c1 < 0:
-            c1 = 0
-        if c2 < 0:
-            c2 = 0
-        cv2.line(close_img, (0, c1), (width, c1), (0, 0, 0), 1)  # 上边线，经验值：2
-        cv2.line(close_img, (0, height-c2), (width, height-c2), (0, 0, 0), 1)  # 下边线，经验值：2
-        # cv2.imshow("cc-2:2lines-thre_img", close_img)
-        # cv2.waitKey(0)
-
-        # 再次查找轮廓
-        contours, hierarchy = cv2.findContours(close_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-        # 重新查找候选轮廓
-        candidate_contours = []  # 存储合理的轮廓
-        for contour in contours:
-            x, y, w, h = cv2.boundingRect(contour)
-            if verifychars(w, h, minwidth=2, maxwidth=round(width / plate_charnum),
-                           maxheight=height):  # 第一次仅筛选字母数字，不含汉字, =3
-                candidate_contours.append(contour)
-        # print("cc-2:2-len(candidate_contours) = ", len(candidate_contours))
-        char_rect = []
-        for contour in candidate_contours:
-            x, y, w, h = cv2.boundingRect(contour)
-            char_rect.append([x, y, w, h])  # 保存候选轮廓外包矩形尺寸数据
-            cv2.rectangle(plate_img, (x, y), (x + w, y + h), (0, 255, 255), 1)
-            cv2.imshow("cc-2:2-plate_img", plate_img)
-        # print("cc-2:plate_charnum, 2-len(char_rect) = ", plate_charnum, len(char_rect))
-        # cv2.waitKey(0)
-
-        # 如果字符块还是少，则请人工处理吧
-        if len(char_rect) < plate_charnum - 1 - 2:
-            print("cc-2:Segmentation problem. Please check")
-            chars = []
-            return chars
 
     # 按x坐标排序（倒序）
     char_rect.sort(key=lambda e: e[0], reverse=True)
@@ -171,7 +254,7 @@ def contour_cutting(plate_img, thre_img, color):
     list_dist = []
     list_posi = []
     maxh = 0  # 候选字符的最大高度
-    while i < min(plate_charnum-1, len(char_rect)):  # i < len(char_rect)。计算短一些，否则平均距离可能会被拉小，影响判断。
+    while i < min(plate_charnum-1, len(char_rect)):  # 计算短一些，否则平均距离可能会被拉小，影响判断。
         x, y, w, h = char_rect[i]
         list_posi.append(int(x + w/2))
         if i != 0:
@@ -180,7 +263,7 @@ def contour_cutting(plate_img, thre_img, color):
         i += 1
     i = 0
     sum_d = sum_w = 0  # 计算平均距离和平均宽度
-    while i < min(plate_charnum-1, len(char_rect))-1:  # i < len(char_rect)-1。计算短一些，否则平均距离可能会被拉小，影响判断。
+    while i < min(plate_charnum-1, len(char_rect))-1:  # 计算短一些，否则平均距离可能会被拉小，影响判断。
         x, y, w, h = char_rect[i]
         k = list_posi[i] - list_posi[i + 1]
         if i != 0 and i != min(plate_charnum, len(char_rect))-1-1:  # 避免两端的极端值影响
@@ -190,45 +273,46 @@ def contour_cutting(plate_img, thre_img, color):
         i += 1
     avg_dist = int(sum_d / (min(plate_charnum, len(char_rect))-1-2))
     avg_w = int(sum_w / (min(plate_charnum, len(char_rect))-1-2))
-    # print("cc-2:avg_dist, avg_w, list_dist, list_posi = ", avg_dist, avg_w, list_dist, list_posi)
-    i = 0
+    # print("cc-4:avg_dist, avg_w, list_dist, list_posi = ", avg_dist, avg_w, list_dist, list_posi)
+    i = tag = 0
     while i < min(plate_charnum-1, len(char_rect)) - 1:  # i < len(char_rect) - 1
         if list_dist[i] <= int(avg_dist*0.8) or list_dist[i] > int(avg_dist*2.0):  # 经验值：*0.8, *2.0
             char_rect.pop(i)
-            # print("cc-2:char_rect["+str(i)+"] was removed due to distance")
+            print("cc-4:char_rect["+str(i)+"] was removed due to distance")
+            tag = 1
             i += 1
             continue
         x, y, w, h = char_rect[i]
-        # print("cc-2:x, y, w, h = ", x, y, w, h)
-        # print("cc-2:avg_w, int(avg_w*0.6), w, int(avg_w*0.8)", avg_w, int(avg_w*0.5), w, int(avg_w*0.7))
+        print("cc-4:x, y, w, h = ", x, y, w, h)
+        print("cc-4:avg_w, int(avg_w*0.6), w, int(avg_w*0.8)", avg_w, int(avg_w*0.5), w, int(avg_w*0.7))
         # 只检查后1位就可以了。再往前检查出错可能性较大，因为经验公式适应性不好:-(
         if i < 1 and avg_w*0.7 < w < int(avg_w*0.8):  # 排除比“1”宽且比平均宽度*0.8小的非字母数字 !!!!!!!!!!!!!!
             char_rect.pop(i)
-            # print("cc-2:char_rect[" + str(i) + "] was removed due to charactor's width")
+            print("cc-4:char_rect[" + str(i) + "] was removed due to charactor's width")
+            tag = 1
         i += 1
-    # print("cc-2:=len(char_rect) = ", len(char_rect))
+    # print("cc-4:=len(char_rect) = ", len(char_rect))
 
-    # 字母数字的个数超过车牌的字母数字的个数，检查车牌尾部是否有其他图案插入
-    if len(char_rect) > plate_charnum:  # 可能有非字母数字插入到char_rect列表中了，很可能是车牌尾部的图案
+    # 字母数字的个数超过车牌的字母数字的个数，检查车牌尾部是否有其他图案插入。如果上面已经截出尾部（tag==1），就不做下面这段了
+    # 也有可能是汉字前面查存在的图块造成len(char_rect) > plate_charnum
+    if tag == 0 and len(char_rect) > plate_charnum:  # 可能有非字母数字插入到char_rect列表中了，很可能是车牌尾部的图案
         x, y, w, h = char_rect[0]
-        '''
-        if y >= int(maxh - h):  # 调整y和h值
-            y = y - int(maxh - h)
-            h = maxh
-        '''
         char_img = thre_img[y:y + h, x:x + w]  # 字符两边略微加宽，左0，右0
         # cv2.imshow("cc-4:-char"+str(i), char_img)
         # cv2.waitKey(0)
         nonzero = cv2.countNonZero(char_img)
         area = w * h  # w * h
-        # print("cc-2:nonzero, area, nonzero/area = ", nonzero, area, nonzero/area)
-        if nonzero/area > 0.75:  # 经验值:0.65 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        # print("cc-4:nonzero, area, nonzero/area = ", nonzero, area, nonzero/area)
+        # 既不是数字“1”的情况。是“1”：nonzero/area > 0.9 and w < avg_w*0.4;
+        # 也不是字母数字（除“1”以外的）的情况。是：nonzero/area < 0.75 and w > avg_w*0.8 and w < avg_w*1.3;
+        if (nonzero/area <= 0.9 or w >= avg_w*0.4) \
+                and (nonzero/area >= 0.75 or w <= avg_w*0.8 or w >= avg_w*1.3):
             char_rect.pop(0)
 
     # 至此，字母数字已经检查完毕，len(char_rect)应当至少不小于plate_charnum - 1，
     # 否则可能有字母数字漏掉了。此图片应是真车牌，但分割失败了，报错并处理下一个。
     if len(char_rect) < plate_charnum - 1:
-        # print("It's a true plate, but doing segmentation failed. Please check later. Go to next one this time.")
+        print("It's a true plate, but doing segmentation failed. Please check later. Go to next one this time.")
         chars = []
         return chars
 
@@ -236,7 +320,7 @@ def contour_cutting(plate_img, thre_img, color):
     i = maxw = 0  # maxw为对字母数字统计的最大宽度
     while i < plate_charnum - 1:  # 这里处理字母数字，只有第一个汉字没有处理
         x, y, w, h = char_rect[i]
-        # print("cc-2:-maxh, x, y, w, h = ", maxh, x, y, w, h)
+        # print("cc-4:-maxh, x, y, w, h = ", maxh, x, y, w, h)
         if w >= maxw:  # 求最大宽度
             maxw = w
         if y >= int(maxh - h):  # 调整y和h值
@@ -244,17 +328,22 @@ def contour_cutting(plate_img, thre_img, color):
             h = maxh
         # print("cc-2:=maxh, x, y, w, h = ", maxh, x, y, w, h)
         char_img = thre_img[y:y + h, x-1:x + w + 1]  # 字符两边略微加宽，左1，右1；y+h+1
-        # cv2.imshow("cc-2:=char"+str(i), char_img)
+        # cv2.imshow("cc-4:=char"+str(i), char_img)
         # cv2.waitKey(0)
 
         char_imgs.append(char_img)
         i += 1
 
-    # 分割汉字
+    # ------------
+    # -5- 分割汉字
+    #
+
     # 按前面计算的字母数字的平均上下限度c1和c2的高度范围来截取汉字这块；宽度按字母数字统计的最大宽度截取
+    # print("c1, c2, height, height-c2, x, maxw, x-1-maxw-2, x-1 = ",
+    # c1, c2, height, height-c2, x, maxw, x-1-maxw-2, x-1)
     char_img = thre_img[c1:height-c2, x-1-maxw-2:x-1]  # [0:height, 0:x-1]保留原始高度（上面汉字可能只截取了一小部分）
     char_imgs.append(char_img)
-    # cv2.imshow("cc-2:Hanzi-thre_img", char_img)
+    # cv2.imshow("cc-5:Hanzi-thre_img", char_img)
     # cv2.waitKey(0)
 
     # 把字符按正序放入chars中，并返回
