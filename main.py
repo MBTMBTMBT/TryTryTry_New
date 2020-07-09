@@ -2,7 +2,6 @@ import cv2
 from recognition import Items, Video
 from tools import Display, Geometry, Similarity, Hog
 
-
 # 摄像机的高度，视角和俯角 - 参考值
 CAMERA_HEIGHT = 6
 CAMERA_VERTICAL_ANGLE = 20
@@ -19,6 +18,10 @@ BOUNDARY_HEIGHT = 12 / 8
 # 即 - 在此线下方的截图才会进行车牌识别
 # 注意这是一个关于屏幕高度的比例值
 PLATE_RECOGNITION_LINE = 0.25
+
+# 二值图扩张的迭代次数和大小
+DILATE_ITERATION = 4
+DILATE_ELLIPSE = (3, 3)
 
 # 最小判定帧数 - 即一个物体存在的帧数超过此值才被判定为真正存在
 SMALLEST_FRAME_NUMBER_LIMIT = 10
@@ -38,7 +41,7 @@ ITEM_TRACE_HEIGHT_WIDTH_CHANGE_RATE = 0.5
 #
 # 小于此值的物体会被当成新物体进行跟踪
 # 注意 - 与上面的相似度是不同的值
-DIFFERENT_ITEM_RECOGNITION_SIMILARITY = 0.4
+DIFFERENT_ITEM_RECOGNITION_SIMILARITY = 0.2
 #
 # 尺寸变化的接受程度
 # 如 - 0.3代表变化后的面积占变化前的0.3-3.33之间被认为有效
@@ -48,11 +51,10 @@ SIZE_UPDATE_RATE_ALLOWANCE = 0.3
 QUICK_SHOT_KEEP_NUM = 6
 
 # 截图频率 - 每多少帧截一次
-QUICK_SHOT_TAKEN_FREQUENCY = 10
+QUICK_SHOT_TAKEN_FREQUENCY = 3
 
 
 def main(video_input: str):
-
     camera = Video.Camera(CAMERA_HEIGHT, CAMERA_VERTICAL_ANGLE, CAMERA_HORIZONTAL_ANGLE, CAMERA_DEPRESSION_ANGLE)
     background_subtractor = cv2.createBackgroundSubtractorKNN()
     video = Video.Video(cv2.VideoCapture(video_input), video_name=video_input)
@@ -72,7 +74,8 @@ def main(video_input: str):
         frame_blur = cv2.GaussianBlur(frame.cv_frame.copy(), (13, 13), 0)  # 高斯模糊
         mask = background_subtractor.apply(frame_blur)  # 由KNN产生
         th = cv2.threshold(mask, 244, 255, cv2.THRESH_BINARY)[1]  # 二值化
-        dilated = cv2.dilate(th, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)), iterations=1)  # 扩张
+        dilated = cv2.dilate(th, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, DILATE_ELLIPSE),
+                             iterations=DILATE_ITERATION)  # 扩张
         # cv2.imshow("dilated", dilated)
 
         contours, hier = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -95,14 +98,18 @@ def main(video_input: str):
                             if each.is_overlapping:
                                 break
                             else:
-                                each_roi = frame_blur[int(coord[1]):int(coord[1] + height), int(coord[0]):int(coord[0] + width)]
+                                each_roi = frame_blur[int(coord[1]):int(coord[1] + height),
+                                           int(coord[0]):int(coord[0] + width)]
                                 box_roi = frame_blur[int(y):int(y + h), int(x):int(x + w)]
                                 similarity = Similarity.classify_hist_with_split(each_roi, box_roi)
                                 if similarity == -1:
                                     break
                                 if similarity[0] >= SAME_ITEM_RECOGNITION_SIMILARITY \
-                                        and SIZE_UPDATE_RATE_ALLOWANCE < each.rect.size() / (w * h) < 1 / SIZE_UPDATE_RATE_ALLOWANCE \
-                                        and ITEM_TRACE_HEIGHT_WIDTH_CHANGE_RATE < (each.rect.width/each.rect.height) / (w/h) < 1 / ITEM_TRACE_HEIGHT_WIDTH_CHANGE_RATE:
+                                        and SIZE_UPDATE_RATE_ALLOWANCE < each.rect.size() / (
+                                        w * h) < 1 / SIZE_UPDATE_RATE_ALLOWANCE \
+                                        and ITEM_TRACE_HEIGHT_WIDTH_CHANGE_RATE < (
+                                        each.rect.width / each.rect.height) / (
+                                        w / h) < 1 / ITEM_TRACE_HEIGHT_WIDTH_CHANGE_RATE:
                                     each.tracker = cv2.TrackerMOSSE_create()
                                     each.tracker.init(frame.cv_frame, (x, y, w, h))
                                     each.remain = True
@@ -145,8 +152,9 @@ def main(video_input: str):
                 if len(each.trace) % QUICK_SHOT_TAKEN_FREQUENCY == 0:
                     shot = each.take_quick_shot(frame.cv_frame)
                     if each.rect.get_mid_point().get_coord()[1] >= video.picture_rect.height * PLATE_RECOGNITION_LINE:
-                        plate_success, plate_str = Items.Item.predict_plate(shot)
-                        print(plate_success, plate_str)
+                        each.record_plate_recognition(shot)
+                        # plate_success, plate_str = Items.Item.predict_plate(shot)
+                        # print(plate_success, plate_str)
                     each.sort_quick_shots()
                     if len(each.quick_shots) >= QUICK_SHOT_KEEP_NUM:
                         pics = []
@@ -166,11 +174,24 @@ def main(video_input: str):
         for each in video.items:
             cv2.rectangle(copy, each.rect.get_coord(), each.rect.get_coord_opposite(), (0, 0, 255), 2)
             _, average_speed = each.get_speed(video, frame_count + 1)
-            string = "ID: " + str(each.identification) \
-                     + " Distance: %.2fm" % each.get_distance(camera, video.picture_rect.height) \
-                     + " horizontal: %.2fm" % each.get_horizontal_offset(camera) \
-                     + " average speed: %.2fm/s" % average_speed
-            cv2.putText(copy, string, each.rect.get_coord(), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 1)
+            string_id = "ID: " + str(each.identification)
+            string_position = "Distance: %.2fm" % each.get_distance(camera, video.picture_rect.height) \
+                              + " horizontal: %.2fm" % each.get_horizontal_offset(camera)
+            string_speed = "Average speed: %.2fm/s" % average_speed
+            if each.predicted_plate != '':
+                string_plate = "Plate: " + each.predicted_plate
+            else:
+                string_plate = "Plate: "
+            rect_coord_x, rect_coord_y = each.rect.get_coord()
+            cv2.putText(copy, string_id, (rect_coord_x, rect_coord_y - 60),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 1)
+            cv2.putText(copy, string_position, (rect_coord_x, rect_coord_y - 40),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 1)
+            cv2.putText(copy, string_speed, (rect_coord_x, rect_coord_y - 20),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 1)
+            # cv2.putText(copy, string_plate, (rect_coord_x, rect_coord_y - 0),
+            #             cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 1)
+            copy = Display.put_chinese_string(copy, string_plate, (rect_coord_x, rect_coord_y - 20), (0, 0, 255))
 
         cv2.rectangle(copy, boundary.get_coord(), boundary.get_coord_opposite(), (255, 255, 0), 2)
 

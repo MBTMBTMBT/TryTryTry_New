@@ -1,6 +1,7 @@
 # coding=utf8
 import cv2 as cv
 import math
+import os
 from tools import *
 from recognition import clpr_entry
 
@@ -31,6 +32,10 @@ class Item(object):
         self.take_quick_shot(cv_frame)
         self.start_time = start_time
         self.end_time = 0
+        self.plates = {}
+        self.predicted_plate = ""
+        self.plate_count = 0
+        self.plate_strs = []
 
     # def get_location(self) -> Geometry.Point:
     #     return self.location
@@ -160,16 +165,44 @@ class Item(object):
     def suicide(self, time_in_ms: int):
         self.end_time = time_in_ms
 
-    # 判断两个物体追踪的矩形框是否重叠
+    def record_plate_recognition(self, image, target_video_path=None) -> (bool, str):
+        success, rst, roi = Item.predict_plate(image)
+        if success:
+            # self.plates.append(rst)
+            if rst in self.plates.keys():
+                self.plates[rst] += 1
+            else:
+                self.plates[rst] = 1
+            if target_video_path is not None:
+                try:
+                    os.mkdir(target_video_path + "//id%d-plate" % self.identification)
+                except WindowsError:
+                    pass
+                cv.imwrite(target_video_path + "//id%d-plate//plate-%d.png"
+                           % (self.identification, self.plate_count), roi)
+                self.plate_strs.append(rst)
+        max_num = 0
+        max_key = rst
+        # print(self.plates)
+        for key in self.plates.keys():
+            if self.plates[key] > max_num:
+                max_num = self.plates[key]
+                max_key = key
+        else:
+            self.predicted_plate = max_key
+        print(self.predicted_plate)
+        return success, rst
+
+    # 识别车牌 - 静态方法
     @staticmethod
     def predict_plate(image) -> (bool, str):
         try:
-            rst = clpr_entry.clpr_main(image)
-            if rst == '':
-                return False, rst
-            return True, rst
+            rst, roi = clpr_entry.clpr_main(image)
+            # if rst == '':
+            #     return False, rst, roi
+            return True, rst, roi
         except:
-            return False, ''
+            return False, '', None
 
     # 避免由于两个物体重叠时调整追踪器矩形框大小而跟丢当前被追踪物体
     # 因此设置“are_overlapping”参数，若其为“True”状态，则该物体追踪器矩形框与其他物体追踪器矩形框有重叠；反之亦然

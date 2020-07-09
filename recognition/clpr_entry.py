@@ -161,8 +161,8 @@ def clpr_main(source_img):
             result['归属'] = '未知'
 
     # print(result)
-    cv2.destroyAllWindows()
-    return result
+    # cv2.destroyAllWindows()
+    return result['车牌号码'], roi
 
 
 if __name__ == '__main__':
