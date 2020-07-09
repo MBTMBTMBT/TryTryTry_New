@@ -65,6 +65,7 @@ def ocr(card_imgs, colors):
         raise FileNotFoundError('mats\\svmchinese.dat')
 
     predict_result = []
+    part_cards_list = []
     roi = None
     card_color = None
     for index, color in enumerate(colors):
@@ -120,7 +121,9 @@ def ocr(card_imgs, colors):
                     # print(o-5:character)
 
                 predict_result.append(character)
+
+            part_cards_list = part_cards
             roi = card_img
             card_color = color
             break
-    return predict_result, roi, card_color  # 识别到的字符、定位的车牌图像、车牌颜色
+    return predict_result, roi, card_color, part_cards_list  # 识别到的字符、定位的车牌图像、车牌颜色、以及初始分割出的车牌各个位

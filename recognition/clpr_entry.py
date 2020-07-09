@@ -116,7 +116,7 @@ def clpr_main(source_img):
     card_imgs, colors = clpr_location.location(source_img)
     if card_imgs is None or colors is None:
         return ''
-    print("location finished -- clpr_entry")
+    # print("location finished -- clpr_entry")
 
     '''
     # 车牌判定
@@ -143,8 +143,8 @@ def clpr_main(source_img):
     '''
 
     # 车牌字符分割和识别
-    predict_result, roi, card_color = clpr_recognition.ocr(card_imgs, colors)
-    print("recognition finished -- clpr_entry")
+    predict_result, roi, card_color, part_cards = clpr_recognition.ocr(card_imgs, colors)
+    # print("recognition finished -- clpr_entry")
 
     # 显示车牌识别结果
     result = {}
@@ -162,7 +162,7 @@ def clpr_main(source_img):
 
     # print(result)
     # cv2.destroyAllWindows()
-    return result['车牌号码'], roi
+    return result['车牌号码'], roi, part_cards
 
 
 if __name__ == '__main__':

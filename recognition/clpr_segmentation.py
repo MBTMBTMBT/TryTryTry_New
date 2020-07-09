@@ -74,7 +74,7 @@ def contour_cutting(plate_img, thre_img, color):
     contours, hierarchy = cv2.findContours(close_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
     # print("cc-2:len(contours) = ", len(contours))
     if len(contours) == 0:
-        print("Not a true plate. Go to next one.")
+        # print("Not a true plate. Go to next one.")
         chars = []
         return chars
 
@@ -101,21 +101,21 @@ def contour_cutting(plate_img, thre_img, color):
             # cv2.imshow("cc-2:0-plate_img", plate_img)
     # print("cc-2:len1-len(candidate_contours) = ", len(candidate_contours))
     if len(candidate_contours) == 0:
-        print("Not a true plate. Go to next one.")
+        # print("Not a true plate. Go to next one.")
         chars = []
         return chars
     if c != 0:
         chravg_h = hh / c
         chravg_y = yy / c
     else:
-        print("Not a true plate. Go to next one.")
+        # print("Not a true plate. Go to next one.")
         chars = []
         return chars
     # cv2.waitKey(0)
 
     # 如果len(candidate_contours) < plate_charnum-1-2，说明符合字符的字符块少于车牌字符数，应该不是车牌，返回空的chars
     if len(candidate_contours) < plate_charnum-1-2:  # 允许有个别字符粘连的可能性，太短就认为不是了，舍弃并返回
-        print("The number of charactors found is too little. May not be a true plate. Go to next one.")
+        # print("The number of charactors found is too little. May not be a true plate. Go to next one.")
         chars = []
         return chars
     else:  # 处理可能的字符粘连情况。  京NE1246，鲁LD9016，鲁Q521MZ，蒙A277EP
@@ -139,7 +139,7 @@ def contour_cutting(plate_img, thre_img, color):
     contours, hierarchy = cv2.findContours(close_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
     # print("cc-2:len(contours) = ", len(contours))
     if len(contours) == 0:
-        print("Not a true plate. Go to next one.")
+        # print("Not a true plate. Go to next one.")
         chars = []
         return chars
 
@@ -163,7 +163,7 @@ def contour_cutting(plate_img, thre_img, color):
             # cv2.imshow("cc-3:0-plate_img", plate_img)
     # print("cc-3:len1-len(candidate_contours) = ", len(candidate_contours))
     if len(candidate_contours) == 0:
-        print("Not a true plate. Go to next one.")
+        # print("Not a true plate. Go to next one.")
         chars = []
         return chars
     # cv2.waitKey(0)
@@ -239,7 +239,7 @@ def contour_cutting(plate_img, thre_img, color):
 
     # 如果字符块还是少，则请人工处理吧
     if len(char_rect) < plate_charnum - 1 - 2:
-        print("cc-4:Segmentation problem. Please check")
+        # print("cc-4:Segmentation problem. Please check")
         chars = []
         return chars
 
@@ -278,17 +278,17 @@ def contour_cutting(plate_img, thre_img, color):
     while i < min(plate_charnum-1, len(char_rect)) - 1:  # i < len(char_rect) - 1
         if list_dist[i] <= int(avg_dist*0.8) or list_dist[i] > int(avg_dist*2.0):  # 经验值：*0.8, *2.0
             char_rect.pop(i)
-            print("cc-4:char_rect["+str(i)+"] was removed due to distance")
+            # print("cc-4:char_rect["+str(i)+"] was removed due to distance")
             tag = 1
             i += 1
             continue
         x, y, w, h = char_rect[i]
-        print("cc-4:x, y, w, h = ", x, y, w, h)
-        print("cc-4:avg_w, int(avg_w*0.6), w, int(avg_w*0.8)", avg_w, int(avg_w*0.5), w, int(avg_w*0.7))
+        # print("cc-4:x, y, w, h = ", x, y, w, h)
+        # print("cc-4:avg_w, int(avg_w*0.6), w, int(avg_w*0.8)", avg_w, int(avg_w*0.5), w, int(avg_w*0.7))
         # 只检查后1位就可以了。再往前检查出错可能性较大，因为经验公式适应性不好:-(
         if i < 1 and avg_w*0.7 < w < int(avg_w*0.8):  # 排除比“1”宽且比平均宽度*0.8小的非字母数字 !!!!!!!!!!!!!!
             char_rect.pop(i)
-            print("cc-4:char_rect[" + str(i) + "] was removed due to charactor's width")
+            # print("cc-4:char_rect[" + str(i) + "] was removed due to charactor's width")
             tag = 1
         i += 1
     # print("cc-4:=len(char_rect) = ", len(char_rect))
@@ -312,7 +312,7 @@ def contour_cutting(plate_img, thre_img, color):
     # 至此，字母数字已经检查完毕，len(char_rect)应当至少不小于plate_charnum - 1，
     # 否则可能有字母数字漏掉了。此图片应是真车牌，但分割失败了，报错并处理下一个。
     if len(char_rect) < plate_charnum - 1:
-        print("It's a true plate, but doing segmentation failed. Please check later. Go to next one this time.")
+        # print("It's a true plate, but doing segmentation failed. Please check later. Go to next one this time.")
         chars = []
         return chars
 

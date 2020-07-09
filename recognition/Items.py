@@ -3,7 +3,7 @@ import cv2 as cv
 import math
 import os
 from tools import *
-from recognition import clpr_entry
+from recognition import clpr_entry, clpr_recognition
 
 
 class Item(object):
@@ -166,7 +166,7 @@ class Item(object):
         self.end_time = time_in_ms
 
     def record_plate_recognition(self, image, target_video_path=None) -> (bool, str):
-        success, rst, roi = Item.predict_plate(image)
+        success, rst, roi, cards = Item.predict_plate(image)
         if success:
             # self.plates.append(rst)
             if rst in self.plates.keys():
@@ -180,8 +180,22 @@ class Item(object):
                     pass
                 cv.imwrite(target_video_path + "\\id%d-plate\\plate-%d.png"
                            % (self.identification, self.plate_count), roi)
-                self.plate_count += 1
                 self.plate_strs.append(rst)
+
+                rst_copy = rst[0:2] + rst[3:]
+                for i in range(len(cards)):
+                    if i == 0:
+                        string = clpr_recognition.provinces[clpr_recognition.provinces.index(rst_copy[0]) - 1]
+                    else:
+                        string = rst_copy[i]
+                    try:
+                        cv.imwrite(target_video_path + "\\id%d-plate\\%s-%d.png"
+                                   % (self.identification, string, self.plate_count), cards[i])
+                    except:
+                        # cv.imshow("unwriteable", cards[i])
+                        # cv.waitKey(0)
+                        continue
+                self.plate_count += 1
         max_num = 0
         max_key = rst
         # print(self.plates)
@@ -191,19 +205,19 @@ class Item(object):
                 max_key = key
         else:
             self.predicted_plate = max_key
-        print(self.predicted_plate)
+        # print(self.predicted_plate)
         return success, rst
 
     # 识别车牌 - 静态方法
     @staticmethod
     def predict_plate(image) -> (bool, str):
         try:
-            rst, roi = clpr_entry.clpr_main(image)
+            rst, roi, cards = clpr_entry.clpr_main(image)
             # if rst == '':
             #     return False, rst, roi
-            return True, rst, roi
+            return True, rst, roi, cards
         except:
-            return False, '', None
+            return False, '', None, None
 
     # 避免由于两个物体重叠时调整追踪器矩形框大小而跟丢当前被追踪物体
     # 因此设置“are_overlapping”参数，若其为“True”状态，则该物体追踪器矩形框与其他物体追踪器矩形框有重叠；反之亦然
