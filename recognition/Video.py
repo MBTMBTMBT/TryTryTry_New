@@ -138,6 +138,7 @@ class Video(object):
             cv.imwrite(string, each_img)
             count += 1
         file = open('%s\\id%d.txt' % (self.video_name, item.identification), 'w')
+        file.write("* 预测车牌号：%s\n" % item.predicted_plate)
         file.write("* 出现时间；%dms %s\n" % (item.start_time, Display.format_time(item.start_time)))
         file.write("* 离开时间：%dms %s\n" % (item.end_time, Display.format_time(item.end_time)))
         start_point = item.real_trace[0]
@@ -145,6 +146,9 @@ class Video(object):
         file.write("* 位移距离：%.2fm\n"
                    % sqrt((start_point[0] - end_point[0]) ** 2 + (start_point[1] - end_point[1]) ** 2))
         file.write("* 平均速度：%.2fm/s <-> %.2fkm/h\n" % (item.average_speed, item.average_speed * 3.6))
+        file.write("* 车牌识别结果统计：\n")
+        for plate, num in item.plates.items():
+            file.write("\t* %s - %d\n" % (plate, num))
         file.close()
         try:
             file = open('%s\\id%d-plate\\plates.txt' % (self.video_name, item.identification), 'w')

@@ -1,4 +1,5 @@
 import cv2
+import threading
 from recognition import Items, Video
 from tools import Display, Geometry, Similarity, Hog
 
@@ -22,6 +23,12 @@ PLATE_RECOGNITION_LINE = 0.25
 # 二值图扩张的迭代次数和大小
 DILATE_ITERATION = 4
 DILATE_ELLIPSE = (3, 3)
+
+# 判定为实际物体的大小限制
+# 下线是像素点面积
+ITEM_CONFIRM_SIZE_LOWER_LIMIT = 6000
+# 注意 - 上限是占全屏面积的比例
+ITEM_CONFIRM_SIZE_UPPER_LIMIT = 1 / 4
 
 # 最小判定帧数 - 即一个物体存在的帧数超过此值才被判定为真正存在
 SMALLEST_FRAME_NUMBER_LIMIT = 10
@@ -48,10 +55,10 @@ DIFFERENT_ITEM_RECOGNITION_SIMILARITY = 0.2
 SIZE_UPDATE_RATE_ALLOWANCE = 0.3
 
 # 保留的截图数量
-QUICK_SHOT_KEEP_NUM = 6
+QUICK_SHOT_KEEP_NUM = 5
 
 # 截图频率 - 每多少帧截一次
-QUICK_SHOT_TAKEN_FREQUENCY = 3
+QUICK_SHOT_TAKEN_FREQUENCY = 5
 
 
 def main(video_input: str):
@@ -64,6 +71,7 @@ def main(video_input: str):
     rect_x = shape[1] // BOUNDARY_X
     boundary = Geometry.Rect(rect_x, rect_y, shape[1] // BOUNDARY_WIDTH, shape[0] // BOUNDARY_HEIGHT)
     item_count = 0
+    plate_recognition_thread_pool = {}
 
     for frame_count in range(video.total_frames_num):
         success, frame = video.video_capture.read()
@@ -82,7 +90,7 @@ def main(video_input: str):
         Items.Item.overlap_match(video.items)
 
         for c in contours:
-            if shape[0] * shape[1] / 4 > cv2.contourArea(c) > 3000:
+            if shape[0] * shape[1] * ITEM_CONFIRM_SIZE_UPPER_LIMIT > cv2.contourArea(c) > ITEM_CONFIRM_SIZE_LOWER_LIMIT:
                 (x, y, w, h) = cv2.boundingRect(c)
                 if not RECOGNITION_HEIGHT_WIDTH_RATE_UPPER_LIMIT > h / w > RECOGNITION_HEIGHT_WIDTH_RATE_LOWER_LIMIT:
                     continue
@@ -152,7 +160,13 @@ def main(video_input: str):
                 if len(each.trace) % QUICK_SHOT_TAKEN_FREQUENCY == 0:
                     shot = each.take_quick_shot(frame.cv_frame)
                     if each.rect.get_mid_point().get_coord()[1] >= video.picture_rect.height * PLATE_RECOGNITION_LINE:
-                        each.record_plate_recognition(shot, video.video_name)
+                        id_num = each.identification
+                        if id_num in plate_recognition_thread_pool.keys():
+                            plate_recognition_thread_pool[id_num].join()
+                        plate_recognition_thread_pool[id_num] \
+                            = threading.Thread(target=each.record_plate_recognition, args=(shot, video.video_name))
+                        plate_recognition_thread_pool[id_num].start()
+                        # each.record_plate_recognition(shot, video.video_name)
                         # plate_success, plate_str = Items.Item.predict_plate(shot)
                         # print(plate_success, plate_str)
                     each.sort_quick_shots()
